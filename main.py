@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel 
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -15,6 +15,31 @@ class InputWidget(QWidget):
         layout.addWidget(self.input_field)
         layout.addWidget(self.input_button)
 
+class LogSection(QWidget):
+    def __init__(self, lineText, buttonText, label):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        label = QLabel(label)
+        log_section = InputWidget(lineText, buttonText)
+
+        layout.addWidget(label)
+        layout.addWidget(log_section)
+    
+class SearchSection(QWidget):
+    def __init__(self, lineText, buttonText, label):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        label = QLabel(label)
+        search_section = InputWidget(lineText, buttonText)
+
+        layout.addWidget(label)
+        layout.addWidget(search_section)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -24,12 +49,11 @@ class MainWindow(QMainWindow):
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        logSection = InputWidget("Enter SKU", "Submit")
-        searchSection = InputWidget("Enter Part Number", "Search")
-        
+        log_Section = LogSection("Enter SKU", "Submit", "Log Section")
+        search_Section = SearchSection("Enter Part Number", "Search", "Search Section")        
         Main_layout = QHBoxLayout(central_widget)
-        Main_layout.addWidget(logSection)
-        Main_layout.addWidget(searchSection)
+        Main_layout.addWidget(log_Section)
+        Main_layout.addWidget(search_Section)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
