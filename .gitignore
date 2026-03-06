@@ -1,2 +1,3 @@
 # Ignore Virtual Environment Folder
 inventory-system/
+*.pyc
