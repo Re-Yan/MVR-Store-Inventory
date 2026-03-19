@@ -1,6 +1,11 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget,  QHBoxLayout
-from widgets import  LogSection, SearchSection
+import os
+
+# Add the parent directory of 'ui' to the system path so Python can find 'logic'
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout,  QHBoxLayout, QStackedWidget, QPushButton, QDateEdit
+from widgets import  LogSection, SearchSection, transaction_page
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -10,12 +15,34 @@ class MainWindow(QMainWindow):
         self.resize(800, 600)
 
         central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        Main_layout = QHBoxLayout(central_widget)
         log_Section = LogSection("Enter SKU", "Submit", "Log Section")
         search_Section = SearchSection("Enter Part Number", "Search", "Search Section")        
-        Main_layout = QHBoxLayout(central_widget)
         Main_layout.addWidget(log_Section)
         Main_layout.addWidget(search_Section)
+        
+        navigation_sideBar = QWidget()
+        nav_layout = QVBoxLayout()
+        navigation_sideBar.setLayout(nav_layout)
+        button1 = QPushButton("Home")
+        button1.clicked.connect(lambda: self.stack.setCurrentIndex(0))
+        button2 = QPushButton("Transactions")
+        button2.clicked.connect(lambda: self.stack.setCurrentIndex(1))
+        nav_layout.addWidget(button1)
+        nav_layout.addWidget(button2)
+
+        transaction_section = transaction_page("Transaction Search")
+
+        self.stack = QStackedWidget()
+        self.stack.addWidget(central_widget)
+        self.stack.addWidget(transaction_section)
+
+        container_widget = QWidget()
+        container_layout = QHBoxLayout()
+        container_widget.setLayout(container_layout)
+        container_layout.addWidget(navigation_sideBar)
+        container_layout.addWidget(self.stack)
+        self.setCentralWidget(container_widget)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
