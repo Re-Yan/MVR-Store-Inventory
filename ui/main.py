@@ -32,6 +32,7 @@ class MainWindow(QMainWindow):
         nav_layout.addWidget(button2)
 
         transaction_section = transaction_page("Transaction Search")
+        
 
         self.stack = QStackedWidget()
         self.stack.addWidget(central_widget)

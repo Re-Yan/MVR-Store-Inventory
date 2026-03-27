@@ -1,6 +1,7 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem
 from PySide6.QtCore import QDate
-from logic.transactions import search_transaction_date
+from logic.transactions import search_transaction_date, query_transaction_date
+
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
         super().__init__()
@@ -39,6 +40,11 @@ class SearchSection(QWidget):
         layout.addWidget(label)
         layout.addWidget(search_section)
 
+class transaction_table(QTableWidget):
+    def __init__(self):
+        super().__init__()
+        self.setColumnCount(6)
+        self.setHorizontalHeaderLabels(["Date", "Part Name", "Quantity", "Type", "Part ID", "Sale Amount"])
 
 class transaction_page(QWidget):
     def __init__(self, label):
@@ -48,13 +54,33 @@ class transaction_page(QWidget):
 
         label = QLabel(label)
         self.date_input = QDateEdit(self)
-        self.date_input.setDate(QDate.currentDate())
+        self.date_input.setDate(QDate(2025, 8, 19))
         self.date_input.setDisplayFormat("yyyy-MM-dd")
         self.date_input.setCalendarPopup(True)
 
+        self.result_table = transaction_table()
+
         transaction_button = QPushButton("Submit")
-        transaction_button.clicked.connect(lambda: search_transaction_date(self.date_input.date()))
+        transaction_button.clicked.connect(self.handle_submit)
 
         layout.addWidget(label)
         layout.addWidget(self.date_input)
         layout.addWidget(transaction_button)
+        layout.addWidget(self.result_table)
+
+    def populate_table(self, results):
+        self.result_table.setRowCount(0)
+        self.result_table.setRowCount(len(results))
+
+        for row_idx, row_data in enumerate(results):
+            for col_idx, value in enumerate(row_data):
+                item = QTableWidgetItem(str(value))
+                self.result_table.setItem(row_idx, col_idx, item)
+
+
+    def handle_submit(self):
+        date_string = self.date_input.date().toString("yyyy-MM-dd")
+
+        results = query_transaction_date(date_string)
+        self.populate_table(results)
+
