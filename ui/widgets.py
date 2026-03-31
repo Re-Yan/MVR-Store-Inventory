@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox
 from PySide6.QtCore import QDate
-from logic.transactions import search_transaction_date, query_transaction_date
+from logic.transactions import query_transaction_date
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -44,7 +44,7 @@ class transaction_table(QTableWidget):
     def __init__(self):
         super().__init__()
         self.setColumnCount(6)
-        self.setHorizontalHeaderLabels(["Date", "Part Name", "Quantity", "Type", "Part ID", "Sale Amount"])
+        self.setHorizontalHeaderLabels(["Date", "Part ID", "Part Name", "Quantity", "Amount Sold", "Type"])
 
 class transaction_page(QWidget):
     def __init__(self, label):
@@ -81,6 +81,12 @@ class transaction_page(QWidget):
     def handle_submit(self):
         date_string = self.date_input.date().toString("yyyy-MM-dd")
 
-        results = query_transaction_date(date_string)
+        try:
+            results = query_transaction_date(date_string)
+        except (RuntimeError, ValueError) as e:
+            QMessageBox.critical(self, "Error Occured", str(e))
+            return
+        
+        print(results)
         self.populate_table(results)
 

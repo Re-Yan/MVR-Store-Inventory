@@ -4,7 +4,7 @@ import os
 # Add the parent directory of 'ui' to the system path so Python can find 'logic'
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout,  QHBoxLayout, QStackedWidget, QPushButton, QDateEdit
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout,  QHBoxLayout, QStackedWidget, QPushButton 
 from widgets import  LogSection, SearchSection, transaction_page
 
 class MainWindow(QMainWindow):
