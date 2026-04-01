@@ -43,8 +43,8 @@ class SearchSection(QWidget):
 class transaction_table(QTableWidget):
     def __init__(self):
         super().__init__()
-        self.setColumnCount(6)
-        self.setHorizontalHeaderLabels(["Date", "Part ID", "Part Name", "Quantity", "Amount Sold", "Type"])
+        self.setColumnCount(7)
+        self.setHorizontalHeaderLabels(["Date", "Part ID", "Part Name", "Quantity", "Amount Sold", "Type", "Revenue"])
 
 class transaction_page(QWidget):
     def __init__(self, label):
@@ -54,7 +54,7 @@ class transaction_page(QWidget):
 
         label = QLabel(label)
         self.date_input = QDateEdit(self)
-        self.date_input.setDate(QDate(2025, 8, 19))
+        self.date_input.setDate(QDate.currentDate())
         self.date_input.setDisplayFormat("yyyy-MM-dd")
         self.date_input.setCalendarPopup(True)
 

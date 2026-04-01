@@ -4,8 +4,6 @@ import os
 DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
 
 def query_transaction_date(date_string, parent=None):
-    conn = sqlite3.connect(DB)
-    cursor = conn.cursor()
     
     query = """
             SELECT
@@ -14,8 +12,9 @@ def query_transaction_date(date_string, parent=None):
                 p.part_name,
                 t.quantity,
                 t.sale_at_time,
-                t.transaction_type
-            FROM transactions t
+                t.transaction_type,
+                t.revenue
+            FROM v_transactions_with_revenue t
             INNER JOIN parts p ON t.part_id = p.sku
             WHERE t.timestamp LIKE ?
         """

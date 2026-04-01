@@ -2,11 +2,12 @@ import sqlite3
 import csv
 import os
 
-DB_NAME = "mvr_inventory.db"
-CSV_FOLDER = "./data/csv_files"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "mvr_inventory.db")
+CSV_FOLDER = os.path.join(BASE_DIR, "data", "csv_files")
 
 def initialize_database():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     # to enable foreign relationships 
@@ -65,8 +66,34 @@ def initialize_database():
     conn.commit()
     return conn
 
+def create_revenue_view():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='table' AND name='transactions'
+    """)
+    if cursor.fetchone() is None:
+        conn.close()
+        raise RuntimeError("transactions table not found. Run initialize_database() and migrate_csv_to_sql() first.")
+
+    cursor.execute("DROP VIEW IF EXISTS v_transactions_with_revenue")
+
+    cursor.execute("""
+        CREATE VIEW v_transactions_with_revenue AS
+            SELECT 
+                *,
+                (sale_at_time - (quantity * cost_at_time)) AS revenue
+            FROM transactions;                  
+                   """)
+
+    conn.commit()
+    conn.close()
+
 def migrate_csv_to_sql():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # 1. Migrate Categories
@@ -131,6 +158,8 @@ def migrate_csv_to_sql():
     # 5. Migrate Transactions
     trans_file = os.path.join(CSV_FOLDER, 'transactions.csv')
     if os.path.exists(trans_file):
+        # Transactions CSV is treated as a full snapshot, so clear existing rows first.
+        cursor.execute("DELETE FROM transactions")
         with open(trans_file, mode='r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
