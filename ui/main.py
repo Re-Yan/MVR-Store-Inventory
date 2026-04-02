@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
         nav_layout.addWidget(button3)
 
         transaction_section = transaction_page("Transaction Search")
-        log_section = LogSection("Enter SKU", "Submit", "Log Section")
+        log_section = LogSection("Log Section")
 
         self.stack = QStackedWidget()
         self.stack.addWidget(central_widget)
