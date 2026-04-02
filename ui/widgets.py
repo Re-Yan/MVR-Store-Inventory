@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox
 from PySide6.QtCore import QDate
 from logic.transactions import query_transaction_date
 
@@ -26,9 +26,13 @@ class LogSection(QWidget):
         sku_label = QLabel("SKU:")
         sku_input.setPlaceholderText("Enter SKU")
 
-        qty_input = QLineEdit()
+        qty_input = QSpinBox()
+        qty_input.setRange(0, 100)
+        qty_input.setValue(1)
+        qty_input.setMinimum(1)
+        qty_input.setSingleStep(1)
         qty_label = QLabel("Quantity:")
-        qty_input.setPlaceholderText("Quantity")
+        
 
         button = QPushButton("Submit")
 
