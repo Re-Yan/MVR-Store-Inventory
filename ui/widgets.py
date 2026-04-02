@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox
 from PySide6.QtCore import QDate
 from logic.transactions import query_transaction_date
 
@@ -20,12 +20,14 @@ class LogSection(QWidget):
     def __init__(self, label):
         super().__init__()
         layout = QVBoxLayout(self)
-
         section_label = QLabel(label)
+        
+        # SKU Input 
         sku_input = QLineEdit()
         sku_label = QLabel("SKU:")
         sku_input.setPlaceholderText("Enter SKU")
 
+        # Quantity Widget
         qty_input = QSpinBox()
         qty_input.setRange(0, 100)
         qty_input.setValue(1)
@@ -33,6 +35,13 @@ class LogSection(QWidget):
         qty_input.setSingleStep(1)
         qty_label = QLabel("Quantity:")
         
+        price_label = QLabel("Price:")
+        price_input = QDoubleSpinBox()
+        price_input.setRange(0.0, 1000000.0)
+        price_input.setDecimals(1)
+        price_input.setSingleStep(1)
+        price_input.setPrefix("₱")
+        price_input.setValue(0)
 
         button = QPushButton("Submit")
 
@@ -45,6 +54,8 @@ class LogSection(QWidget):
 
         layout.addWidget(section_label)
         layout.addWidget(input_layer)
+        layout.addWidget(price_label)
+        layout.addWidget(price_input)
         layout.addWidget(button)
     
 class SearchSection(QWidget):
