@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox
 from PySide6.QtCore import QDate
 from logic.transactions import query_transaction_date
 
@@ -19,45 +19,40 @@ class InputWidget(QWidget):
 class LogSection(QWidget):
     def __init__(self, label):
         super().__init__()
-        layout = QVBoxLayout(self)
         section_label = QLabel(label)
-        
-        # SKU Input 
-        sku_input = QLineEdit()
-        sku_label = QLabel("SKU:")
-        sku_input.setPlaceholderText("Enter SKU")
+        form_layout = QFormLayout()
+
+        # Input Widgets for QFormLayout
+        self.sku_input = QLineEdit()
+        self.sku_input.setPlaceholderText("Enter SKU")
+        self.qty_input = QSpinBox()
+        self.price_input = QDoubleSpinBox()
+
+        # Row Labels
+        form_layout.addRow("SKU:", self.sku_input)
+        form_layout.addRow("Quantity:", self.qty_input)
+        form_layout.addRow("Price:", self.price_input)
 
         # Quantity Widget
-        qty_input = QSpinBox()
-        qty_input.setRange(0, 100)
-        qty_input.setValue(1)
-        qty_input.setMinimum(1)
-        qty_input.setSingleStep(1)
-        qty_label = QLabel("Quantity:")
+        self.qty_input.setRange(0, 100)
+        self.qty_input.setValue(1)
+        self.qty_input.setMinimum(1)
+        self.qty_input.setSingleStep(1)
         
-        price_label = QLabel("Price:")
-        price_input = QDoubleSpinBox()
-        price_input.setRange(0.0, 1000000.0)
-        price_input.setDecimals(1)
-        price_input.setSingleStep(1)
-        price_input.setPrefix("₱")
-        price_input.setValue(0)
+        # Price Widget
+        self.price_input.setRange(0.0, 1000000.0)
+        self.price_input.setDecimals(1)
+        self.price_input.setSingleStep(1)
+        self.price_input.setPrefix("₱")
+        self.price_input.setValue(0)
 
-        button = QPushButton("Submit")
+        # Submit Button
+        self.button = QPushButton("Submit")
+        form_layout.addRow(self.button)
 
-        input_layer = QWidget()
-        input_layer_layout = QHBoxLayout(input_layer)
-        input_layer_layout.addWidget(sku_label)
-        input_layer_layout.addWidget(sku_input)
-        input_layer_layout.addWidget(qty_label)
-        input_layer_layout.addWidget(qty_input)
+        self.setLayout(form_layout)
 
-        layout.addWidget(section_label)
-        layout.addWidget(input_layer)
-        layout.addWidget(price_label)
-        layout.addWidget(price_input)
-        layout.addWidget(button)
-    
+
 class SearchSection(QWidget):
     def __init__(self, lineText, buttonText, label):
         super().__init__()
