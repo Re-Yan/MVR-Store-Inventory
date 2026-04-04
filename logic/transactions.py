@@ -17,6 +17,7 @@ def query_transaction_date(date_string, parent=None):
             FROM v_transactions_with_revenue t
             INNER JOIN parts p ON t.part_id = p.sku
             WHERE t.timestamp LIKE ?
+            ORDER BY t.id DESC
         """
 
     try:
