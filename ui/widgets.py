@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox
 from PySide6.QtCore import QDate
-from logic.transactions import query_transaction_date
+from datetime import datetime
+from logic.transactions import query_transaction_date, insert_transaction
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -19,8 +20,8 @@ class InputWidget(QWidget):
 class LogSection(QWidget):
     def __init__(self, label):
         super().__init__()
-        section_label = QLabel(label)
         form_layout = QFormLayout()
+        section_label = QLabel(label)
 
         # Input Widgets for QFormLayout
         self.sku_input = QLineEdit()
@@ -29,6 +30,7 @@ class LogSection(QWidget):
         self.price_input = QDoubleSpinBox()
 
         # Row Labels
+        form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
         form_layout.addRow("Price:", self.price_input)
@@ -48,10 +50,21 @@ class LogSection(QWidget):
 
         # Submit Button
         self.button = QPushButton("Submit")
+        self.button.clicked.connect(self.handle_submit)
         form_layout.addRow(self.button)
+
+        
 
         self.setLayout(form_layout)
 
+    def handle_submit(self):
+        sku = self.sku_input.text()
+        quantity = self.qty_input.value()
+        price = self.price_input.value()
+        date = datetime.now()
+        formatted_date = date.strftime("%Y-%m-%d")
+
+        insert_transaction(formatted_date, quantity, sku, price)
 
 class SearchSection(QWidget):
     def __init__(self, lineText, buttonText, label):
@@ -94,6 +107,7 @@ class transaction_page(QWidget):
         layout.addWidget(self.result_table)
 
     def populate_table(self, results):
+        print(type(results))
         self.result_table.setRowCount(0)
         self.result_table.setRowCount(len(results))
 

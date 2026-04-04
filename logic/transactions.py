@@ -31,3 +31,53 @@ def query_transaction_date(date_string, parent=None):
         return results
     except sqlite3.Error as e:
         raise RuntimeError(f"Database Query failed: {e}") from e
+
+def insert_transaction(date, quantity, sku, price):
+    select_query = """
+        SELECT
+            p.part_name,
+            p.base_cost_price
+        FROM parts p
+        WHERE sku = ?
+        """
+
+    insert_query = """
+        INSERT INTO transactions (id, timestamp, quantity, part_id, transaction_type, cost_at_time, sale_at_time, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+    
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        
+        # try and except clause for the select query
+        try:
+            cursor.execute(select_query, (sku,))
+            select_result = cursor.fetchone()
+            
+            if select_result  is None:
+                raise ValueError(f"ERROR: {sku} Not Found in Parts Table")
+            
+            part_name, cost_price = select_result
+
+        except sqlite3.Error as e:
+            print(f"Part ID Lookup Failed: - {e}")
+            return
+
+        # try and except clause for the insert query
+        try:
+            cursor.execute(insert_query, (
+                None,   # id should be NONE as this column is AUTOINCREMENT
+                date,
+                quantity,
+                sku,
+                "SALE",  # any transaction logged is of type SALE
+                cost_price,
+                price,
+                "",  # Notes will remain empty for now
+            ))
+            conn.commit()
+            print(f"Transaction Recorded")
+
+        except sqlite3.Error as e:
+            print(f"ERROR: Failed to Insert Transaction - {e}")
+            return
