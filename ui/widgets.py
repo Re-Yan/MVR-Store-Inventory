@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox
-from PySide6.QtCore import QDate
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
+from PySide6.QtCore import QDate, QStringListModel
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction
 
@@ -72,11 +72,20 @@ class SearchSection(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
+        self.view = QListView()
+        self.model = QStringListModel()
+        self.data = ["item1", "item2", "item3"]
+        self.model.setStringList(self.data)
+
+        self.view.setModel(self.model)
+
         label = QLabel(label)
         search_section = InputWidget(lineText, buttonText)
 
         layout.addWidget(label)
         layout.addWidget(search_section)
+        layout.addWidget(self.view)
+
 
 class transaction_table(QTableWidget):
     def __init__(self):
