@@ -69,22 +69,31 @@ class LogSection(QWidget):
 class SearchSection(QWidget):
     def __init__(self, lineText, buttonText, label):
         super().__init__()
+        self.counter = 0
         layout = QVBoxLayout()
         self.setLayout(layout)
+        label = QLabel(label)
 
+        self.search_section = QLineEdit()
         self.view = QListView()
+        self.items = []
         self.model = QStringListModel()
-        self.data = ["item1", "item2", "item3"]
-        self.model.setStringList(self.data)
 
         self.view.setModel(self.model)
 
-        label = QLabel(label)
-        search_section = InputWidget(lineText, buttonText)
-
+        self.search_section.textChanged.connect(self.on_text_changed)
+ 
         layout.addWidget(label)
-        layout.addWidget(search_section)
+        layout.addWidget(self.search_section)
         layout.addWidget(self.view)
+
+    def on_text_changed(self, text):
+        if not text.strip():
+            return
+        self.counter += 1
+        self.items.append(f"Suggestion {self.counter}")
+        self.model.setStringList(self.items)
+
 
 class transaction_table(QTableWidget):
     def __init__(self):
