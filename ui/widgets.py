@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
-from PySide6.QtCore import QDate, QStringListModel
+from PySide6.QtCore import QDate, QStringListModel, QTimer
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction
 
@@ -78,22 +78,27 @@ class SearchSection(QWidget):
         self.view = QListView()
         self.items = []
         self.model = QStringListModel()
-
         self.view.setModel(self.model)
 
-        self.search_section.textChanged.connect(self.on_text_changed)
+        self.search_section.textChanged.connect(self.debounce_timer)
+
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+
+        self.timer.timeout.connect(self.on_text_changed)
  
         layout.addWidget(label)
         layout.addWidget(self.search_section)
         layout.addWidget(self.view)
 
-    def on_text_changed(self, text):
-        if not text.strip():
-            return
+    def on_text_changed(self):
         self.counter += 1
         self.items.append(f"Suggestion {self.counter}")
         self.model.setStringList(self.items)
 
+    def debounce_timer(self):
+        self.timer.start(300)
+        
 
 class transaction_table(QTableWidget):
     def __init__(self):
