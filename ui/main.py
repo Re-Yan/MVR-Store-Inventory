@@ -16,7 +16,15 @@ class MainWindow(QMainWindow):
 
         central_widget = QWidget()
         Main_layout = QHBoxLayout(central_widget)
-        search_Section = SearchSection("Enter Part Number", "Search", "Search Section") 
+        
+        transaction_section = transaction_page("Transaction Search")
+        log_section = LogSection("Log Section")
+        
+        # Create a callback that fills the SKU field when a suggestion is selected
+        def on_suggestion_selected(sku):
+            log_section.sku_input.setText(sku)
+        
+        search_Section = SearchSection("Enter Part Number", "Search", "Search Section", on_selection=on_suggestion_selected) 
         Main_layout.addWidget(search_Section)
         
         navigation_sideBar = QWidget()
@@ -33,9 +41,6 @@ class MainWindow(QMainWindow):
         nav_layout.addWidget(button1)
         nav_layout.addWidget(button2)
         nav_layout.addWidget(button3)
-
-        transaction_section = transaction_page("Transaction Search")
-        log_section = LogSection("Log Section")
 
         self.stack = QStackedWidget()
         self.stack.addWidget(central_widget)

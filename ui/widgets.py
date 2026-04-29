@@ -1,7 +1,7 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
-from PySide6.QtCore import QDate, QStringListModel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
+from PySide6.QtCore import QDate, QStringListModel, QTimer, Qt
 from datetime import datetime
-from logic.transactions import query_transaction_date, insert_transaction
+from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -53,8 +53,6 @@ class LogSection(QWidget):
         self.button.clicked.connect(self.handle_submit)
         form_layout.addRow(self.button)
 
-        
-
         self.setLayout(form_layout)
 
     def handle_submit(self):
@@ -67,25 +65,64 @@ class LogSection(QWidget):
         insert_transaction(formatted_date, quantity, sku, price)
 
 class SearchSection(QWidget):
-    def __init__(self, lineText, buttonText, label):
+    def __init__(self, lineText, buttonText, label, on_selection=None):
         super().__init__()
+        self.on_selection = on_selection
         layout = QVBoxLayout()
         self.setLayout(layout)
+        label = QLabel(label)
 
+        self.search_section = QLineEdit()
+        self.search_section.setPlaceholderText(lineText)
         self.view = QListView()
+        self.items = []
         self.model = QStringListModel()
-        self.data = ["item1", "item2", "item3"]
-        self.model.setStringList(self.data)
-
         self.view.setModel(self.model)
 
-        label = QLabel(label)
-        search_section = InputWidget(lineText, buttonText)
+        # Store the mapping from display text to SKU for selection
+        self._display_to_sku = {}
 
+        self.search_section.textChanged.connect(self.debounce_timer)
+        self.view.clicked.connect(self.on_item_selected)
+
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+
+        self.timer.timeout.connect(self.on_text_changed)
+ 
         layout.addWidget(label)
-        layout.addWidget(search_section)
+        layout.addWidget(self.search_section)
         layout.addWidget(self.view)
 
+    def on_text_changed(self):
+        search_term = self.search_section.text()
+        results = search_suggestions(search_term)
+        
+        # clear out previous results by emptying the list/dictionary
+        self.items = []
+        self._display_to_sku = {}
+        
+        for sku, part_name, alias_name in results:
+            if alias_name:
+                display_text = f"{sku} | {part_name} ({alias_name})"
+            else:
+                display_text = f"{sku} | {part_name}"
+            self.items.append(display_text)
+            self._display_to_sku[display_text] = sku
+
+        print(self._display_to_sku)
+        
+        self.model.setStringList(self.items)
+
+    def on_item_selected(self, index):
+        selected_text = self.items[index.row()]
+        sku = self._display_to_sku.get(selected_text)
+        if sku and self.on_selection:
+            self.on_selection(sku)
+
+    def debounce_timer(self):
+        self.timer.start(300)
+        
 
 class transaction_table(QTableWidget):
     def __init__(self):
