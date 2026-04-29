@@ -316,3 +316,4 @@ def migrate_csv_to_sql():
 if __name__ == "__main__":
     initialize_database()
     migrate_csv_to_sql()
+    create_revenue_view()

@@ -98,6 +98,7 @@ class SearchSection(QWidget):
         search_term = self.search_section.text()
         results = search_suggestions(search_term)
         
+        # clear out previous results by emptying the list/dictionary
         self.items = []
         self._display_to_sku = {}
         
@@ -108,6 +109,8 @@ class SearchSection(QWidget):
                 display_text = f"{sku} | {part_name}"
             self.items.append(display_text)
             self._display_to_sku[display_text] = sku
+
+        print(self._display_to_sku)
         
         self.model.setStringList(self.items)
 
