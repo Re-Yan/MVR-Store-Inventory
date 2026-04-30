@@ -197,7 +197,7 @@ class restock_page(QWidget):
 
         self.setLayout(form_layout)
 
-class restock_table(QTableWidget):
+class request_table(QTableWidget):
     def __init__(self):
         super().__init__()
         self.setColumnCount(7)
@@ -213,10 +213,14 @@ class request_page(QWidget):
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
         self.qty_input = QSpinBox()
+        self.input_button = QPushButton("Submit")
+        self.request_table = request_table()
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
+        form_layout.addRow(self.input_button)
+        form_layout.addRow(self.request_table)
 
         # Quantity Widget Settings
         self.qty_input.setRange(0, 100)
