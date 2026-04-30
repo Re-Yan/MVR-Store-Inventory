@@ -183,8 +183,22 @@ class restock_page(QWidget):
 
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
+        self.qty_input = QSpinBox()
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
+        form_layout.addRow("Quantity:", self.qty_input)
+
+        # Quantity Widget Settings
+        self.qty_input.setRange(0, 100)
+        self.qty_input.setValue(1)
+        self.qty_input.setMinimum(1)
+        self.qty_input.setSingleStep(1)
 
         self.setLayout(form_layout)
+
+class restock_table(QTableWidget):
+    def __init__(self):
+        super().__init__()
+        self.setColumnCount(7)
+        self.setHorizontalHeaderLabels(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
