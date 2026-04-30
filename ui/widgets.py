@@ -175,3 +175,16 @@ class transaction_page(QWidget):
         print(results)
         self.populate_table(results)
 
+class restock_page(QWidget):
+    def __init__(self, label):
+        super().__init__()
+        form_layout = QFormLayout()
+        section_label = QLabel(label)
+
+        self.sku_input = QLineEdit()
+        self.sku_input.setPlaceholderText("Enter Item Code")
+
+        form_layout.addRow(section_label)
+        form_layout.addRow("SKU:", self.sku_input)
+
+        self.setLayout(form_layout)
