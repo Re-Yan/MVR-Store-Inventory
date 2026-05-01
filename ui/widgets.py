@@ -187,12 +187,14 @@ class restock_page(QWidget):
         self.qty_input = QSpinBox()
         self.submit_button = QPushButton("Submit")
         self.restock_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number"])
+        self.finalize_button = QPushButton("Finalize Restock")
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
         form_layout.addRow(self.submit_button)
         form_layout.addRow(self.restock_table)
+        form_layout.addRow(self.finalize_button)
 
         # Quantity Widget Settings
         self.qty_input.setRange(0, 100)
