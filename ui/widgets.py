@@ -185,10 +185,12 @@ class restock_page(QWidget):
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
         self.qty_input = QSpinBox()
+        self.submit_button = QPushButton("Submit")
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
+        form_layout.addRow(self.submit_button)
 
         # Quantity Widget Settings
         self.qty_input.setRange(0, 100)
