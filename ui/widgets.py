@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
 from PySide6.QtCore import QDate, QStringListModel, QTimer, Qt
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
@@ -179,6 +179,7 @@ class restock_page(QWidget):
     def __init__(self, label):
         super().__init__()
         form_layout = QFormLayout()
+        # horizontal_layout = 
         section_label = QLabel(label)
 
         self.sku_input = QLineEdit()
@@ -214,12 +215,18 @@ class request_page(QWidget):
         self.sku_input.setPlaceholderText("Enter Item Code")
         self.qty_input = QSpinBox()
         self.input_button = QPushButton("Submit")
+        self.reset_table = QPushButton("Reset Table")
         self.request_table = request_table()
+
+        button_container = QWidget()
+        horizontal_layout = QHBoxLayout(button_container)
+        horizontal_layout.addWidget(self.input_button)
+        horizontal_layout.addWidget(self.reset_table)
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
-        form_layout.addRow(self.input_button)
+        form_layout.addRow(button_container)
         form_layout.addRow(self.request_table)
 
         # Quantity Widget Settings
