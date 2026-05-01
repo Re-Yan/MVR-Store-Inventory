@@ -124,11 +124,11 @@ class SearchSection(QWidget):
         self.timer.start(300)
         
 
-class transaction_table(QTableWidget):
-    def __init__(self):
+class SectionTable(QTableWidget):
+    def __init__(self, headers, parent=None):
         super().__init__()
-        self.setColumnCount(7)
-        self.setHorizontalHeaderLabels(["Date", "Part ID", "Part Name", "Quantity", "Amount Sold", "Type", "Revenue"])
+        self.setColumnCount(len(headers))
+        self.setHorizontalHeaderLabels(headers)
 
 class transaction_page(QWidget):
     def __init__(self, label):
@@ -142,7 +142,7 @@ class transaction_page(QWidget):
         self.date_input.setDisplayFormat("yyyy-MM-dd")
         self.date_input.setCalendarPopup(True)
 
-        self.result_table = transaction_table()
+        self.result_table = SectionTable(["Date", "Part ID", "Part Name", "Quantity", "Amount Sold", "Type", "Revenue"])
 
         transaction_button = QPushButton("Submit")
         transaction_button.clicked.connect(self.handle_submit)
@@ -200,12 +200,6 @@ class restock_page(QWidget):
 
         self.setLayout(form_layout)
 
-class request_table(QTableWidget):
-    def __init__(self):
-        super().__init__()
-        self.setColumnCount(7)
-        self.setHorizontalHeaderLabels(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
-
 class request_page(QWidget):
     def __init__(self, label):
         super().__init__()
@@ -218,7 +212,8 @@ class request_page(QWidget):
         self.qty_input = QSpinBox()
         self.input_button = QPushButton("Submit")
         self.reset_table = QPushButton("Reset Table")
-        self.request_table = request_table()
+        self.request_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
+
 
         button_container = QWidget()
         horizontal_layout = QHBoxLayout(button_container)
