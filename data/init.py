@@ -70,6 +70,41 @@ def ensure_transactions_use_sku_fk(cursor):
     cursor.execute("ALTER TABLE transactions_new RENAME TO transactions")
     cursor.execute("PRAGMA foreign_keys = ON")
 
+def create_restock_tables():
+    conn = sqlite3.connecct(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS restock_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_on TEXT NOT NULL DEFAULT CURRENT_DATE,
+            status TEXT NOT NULL DEFAULT 'OPEN'
+                CHECK(status IN ('OPEN', 'ORDERED', 'COMPLETED')),
+            ordered_on TEXT NOT NULL DEFAULT CURRENT_DATE,
+            completed_on TEXT NOT NULL DEFAULT CURRENT_DATE
+            )
+                   """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS request_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id INTEGER NOT NULL, 
+            part_id INTEGER NOT NULL,
+            quantity_requested INTEGER,
+            urgency_score INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'PENDING'
+                CHECK(status IN ('PENDING', 'PROCURED', 'CARRIED OVER')),
+            created_on TEXT NOT NULL DEFAULT CURRENT_DATE,
+            date_carried_over TEXT,
+            notes TEXT,
+            
+            FOREIGN KEY (batch_id) REFERENCES restock_batches(id),
+            FOREIGN KEY (part_id) REFERENCES parts(id)
+            )
+                   """)
+
 def initialize_database():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
