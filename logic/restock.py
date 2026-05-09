@@ -26,6 +26,7 @@ def create_batch(self):
         batch_id = cursor.lastrowid() # retrieves the id of the INSERT query
         conn.commit()
         print(f"New Request Batch Created: Batch #{batch_id}")
+        return batch_id
 
 def get_current_batch(self):
     # fetches the most recent open OPEN batch. If none exists, create one
@@ -40,10 +41,10 @@ def get_current_batch(self):
 
         try:
             cursor.execute(search_query)
-            result = cursor.fetchall()
+            result = cursor.fetchone()
 
             if not result:
-                create_batch()
+                return self.create_batch()
 
-        except sqlite3.error as e:
+        except sqlite3.Error as e:
             raise RuntimeError("cannot get batch data: {e}") from e
