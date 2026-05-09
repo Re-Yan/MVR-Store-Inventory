@@ -4,20 +4,22 @@ from datetime import datetime
 
 DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
 
+def get_curr_date(self):
+        date = datetime.now()
+        curr_formatted_date = date.strftime("%Y-%m-%d")
+
 def create_batch(self):
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
-        date = datetime.now()
-        curr_formatted_date = date.strftime("%Y-%m-%d")
-        
-        insert_query = """
+        curr_date = get_curr_date()
+        insert_batch = """
             INSERT INTO restock_batches (created_on, status, ordered_on, completed_on)
             VALUES (?, ?, ?, ?)
             """
         
         # Create a Fresh New Request Batch
-        cursor.execute(insert_query, (
-            curr_formatted_date, # date the request batch is created on
+        cursor.execute(insert_batch, (
+            curr_date, # date the request batch is created on
             "OPEN",
             None,
             None
@@ -32,7 +34,8 @@ def get_current_batch(self):
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
-        search_query = """
+
+        search_batch = """
             SELECT id
             FROM restock_batches
             WHERE status = 'OPEN'
@@ -41,7 +44,7 @@ def get_current_batch(self):
             """
 
         try:
-            cursor.execute(search_query)
+            cursor.execute(search_batch)
             result = cursor.fetchone()
 
             if not result:
@@ -49,3 +52,25 @@ def get_current_batch(self):
 
         except sqlite3.Error as e:
             raise RuntimeError("cannot get batch data: {e}") from e
+
+def add_request_item(batch_id, part_id, quantity, status, date_carried_over, notes):
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+
+        curr_date = get_curr_date()
+
+        insert_request_item = """
+            INSERT INTO request_items (batch_id, part_id, quantity_requested, urgency_score, status, created_on, date_carried_over, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        cursor.execute(insert_request_item, (
+            batch_id,
+            part_id,
+            quantity,
+            "1",
+            status,
+            curr_date,
+            date_carried_over,
+            notes
+        ))
