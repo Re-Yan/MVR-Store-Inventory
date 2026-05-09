@@ -11,13 +11,12 @@ def create_batch(self):
         curr_formatted_date = date.strftime("%Y-%m-%d")
         
         insert_query = """
-            INSERT INTO restock_batches (id, created_on, status, ordered_on, completed_on)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO restock_batches (created_on, status, ordered_on, completed_on)
+            VALUES (?, ?, ?, ?)
             """
         
         # Create a Fresh New Request Batch
         cursor.execute(insert_query, (
-            None, # id is AUTOINCREMENT no need to give a value
             curr_formatted_date, # date the request batch is created on
             "OPEN",
             None,
@@ -34,9 +33,11 @@ def get_current_batch(self):
         cursor = conn.cursor()
 
         search_query = """
-            SELECT *
-            FROM restock_batches rb
+            SELECT id
+            FROM restock_batches
             WHERE status = 'OPEN'
+            ORDER BY created_on DESC, id DESC
+            LIMIT 1
             """
 
         try:
