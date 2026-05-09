@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QL
 from PySide6.QtCore import QDate, QStringListModel, QTimer, Qt
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
+from logic.restock import get_current_batch
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -237,4 +238,14 @@ class request_page(QWidget):
         self.qty_input.setSingleStep(1)
 
         self.setLayout(form_layout)
+
+    def handle_submit(self):
+
+        try:
+            results = get_current_batch()
+        except (RuntimeError) as e:
+            QMessageBox.critical(self, "ERROR:", str(e))
+            return
+            
+
 
