@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QL
 from PySide6.QtCore import QDate, QStringListModel, QTimer, Qt
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
-from logic.restock import get_current_batch
+from logic.restock import get_current_batch, add_request_item, get_part_id_by_sku
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -216,6 +216,7 @@ class request_page(QWidget):
         self.sku_input.setPlaceholderText("Enter Item Code")
         self.qty_input = QSpinBox()
         self.input_button = QPushButton("Submit")
+        self.input_button.clicked.connect(self.handle_submit)
         self.reset_table = QPushButton("Reset Table")
         self.request_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
 
@@ -240,12 +241,25 @@ class request_page(QWidget):
         self.setLayout(form_layout)
 
     def handle_submit(self):
+        sku = self.sku_input.text().strip()
+        quantity = self.qty_input.value()
+
+        if not sku:
+            QMessageBox.warning(self, "Input Error", "SKU cannot be empty.")
+            return
+        
+        part_id = get_part_id_by_sku(sku)
+        if part_id is None:
+            QMessageBox.warning(self, f"{sku} not found in the database.")
+            return
 
         try:
-            results = get_current_batch()
+            batch_id = get_current_batch()
         except (RuntimeError) as e:
             QMessageBox.critical(self, "ERROR:", str(e))
             return
+
+        add_request_item(batch_id, part_id, quantity, "PENDING", "")
             
 
 
