@@ -250,7 +250,7 @@ class request_page(QWidget):
         
         part_id = get_part_id_by_sku(sku)
         if part_id is None:
-            QMessageBox.warning(self, f"{sku} not found in the database.")
+            QMessageBox.warning(self,"SKU Error", f"{sku} not found in the database.")
             return
 
         try:
@@ -259,7 +259,12 @@ class request_page(QWidget):
             QMessageBox.critical(self, "ERROR:", str(e))
             return
 
-        add_request_item(batch_id, part_id, quantity, "PENDING", "")
-            
+        try:
+            add_request_item(batch_id, part_id, quantity, "PENDING", "")
+        except (RuntimeError) as e:
+            QMessageBox.critical(self, "ERROR:", str(e))
+        else:
+            QMessageBox.information(self, "Item Submitted to DB", "Action Completed Successfully") 
+
 
 

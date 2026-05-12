@@ -10,6 +10,7 @@ def get_curr_date():
         return curr_formatted_date
 
 def get_part_id_by_sku(sku):
+    # TODO: add error handling for this function: wrap in try/except block
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
@@ -23,26 +24,25 @@ def get_part_id_by_sku(sku):
         part_id = cursor.fetchone()
         return part_id[0] if part_id else None
 
-def create_batch():
-    with sqlite3.connect(DB) as conn:
-        cursor = conn.cursor()
-        curr_date = get_curr_date()
-        insert_batch = """
-            INSERT INTO restock_batches (created_on, status, ordered_on, completed_on)
-            VALUES (?, ?, ?, ?)
-        """
-        
-        # Create a Fresh New Request Batch
-        cursor.execute(insert_batch, (
-            curr_date, # date the request batch is created on
-            "OPEN",
-            None,
-            None
-        ))
-        batch_id = cursor.lastrowid() # retrieves the id of the INSERT query
-        conn.commit()
-        print(f"New Request Batch Created: Batch #{batch_id}")
-        return batch_id
+def create_batch(conn):
+    cursor = conn.cursor()
+    curr_date = get_curr_date()
+
+    insert_batch = """
+        INSERT INTO restock_batches (created_on, status, ordered_on, completed_on)
+        VALUES (?, ?, ?, ?)
+    """
+    
+    # Create a Fresh New Request Batch
+    cursor.execute(insert_batch, (
+        curr_date, # date the request batch is created on
+        "OPEN",
+        None,
+        None
+    ))
+    batch_id = cursor.lastrowid # retrieves the id of the INSERT query
+    print(f"New Request Batch Created: Batch #{batch_id}")
+    return batch_id
 
 def get_current_batch():
     # fetches the most recent open OPEN batch. If none exists, create one
@@ -62,10 +62,12 @@ def get_current_batch():
             result = cursor.fetchone()
 
             if not result:
-                return create_batch()
+                return create_batch(conn)
+
+            return result[0]
 
         except sqlite3.Error as e:
-            raise RuntimeError("cannot get batch data: {e}") from e
+            raise RuntimeError(f"cannot get batch data: {e}") from e
 
 def add_request_item(batch_id, part_id, quantity, status, notes):
     with sqlite3.connect(DB) as conn:
@@ -75,16 +77,20 @@ def add_request_item(batch_id, part_id, quantity, status, notes):
 
         insert_request_item = """
             INSERT INTO request_items (batch_id, part_id, quantity_requested, urgency_score, status, created_on, date_carried_over, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
-
-        cursor.execute(insert_request_item, (
-            batch_id,
-            part_id,
-            quantity,
-            "1",
-            status,
-            curr_date,
-            None,
-            notes
+        try:
+            cursor.execute(insert_request_item, (
+                batch_id,
+                part_id,
+                quantity,
+                1,
+                status,
+                curr_date,
+                None,
+                notes
         ))
+
+        except sqlite3.Error as e:
+            raise RuntimeError(f"Cannot Insert into DB: {e}") from e           
+        
