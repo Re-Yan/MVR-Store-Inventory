@@ -124,7 +124,7 @@ def initialize_database():
             cost_at_time INTEGER NOT NULL, 
             sale_at_time INTEGER NOT NULL,
             notes TEXT,
-            FOREIGN KEY (part_id) REFERENCES parts(sku)
+            FOREIGN KEY (part_id) REFERENCES parts(id)
             )
         """)
 
@@ -209,7 +209,7 @@ def create_restock_tables():
                 notes TEXT,
                 
                 FOREIGN KEY (batch_id) REFERENCES restock_batches(id),
-                FOREIGN KEY (part_id) REFERENCES parts(sku)
+                FOREIGN KEY (part_id) REFERENCES parts(id)
                 )
                     """)
 
