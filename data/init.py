@@ -190,8 +190,8 @@ def create_restock_tables():
                 created_on TEXT NOT NULL DEFAULT CURRENT_DATE,
                 status TEXT NOT NULL DEFAULT 'OPEN'
                     CHECK(status IN ('OPEN', 'ORDERED', 'COMPLETED')),
-                ordered_on TEXT NOT NULL DEFAULT CURRENT_DATE,
-                completed_on TEXT NOT NULL DEFAULT CURRENT_DATE
+                ordered_on TEXT,
+                completed_on TEXT
                 )
                     """)
         
@@ -209,7 +209,7 @@ def create_restock_tables():
                 notes TEXT,
                 
                 FOREIGN KEY (batch_id) REFERENCES restock_batches(id),
-                FOREIGN KEY (part_id) REFERENCES parts(id)
+                FOREIGN KEY (part_id) REFERENCES parts(sku)
                 )
                     """)
 
@@ -353,3 +353,4 @@ if __name__ == "__main__":
     initialize_database()
     migrate_csv_to_sql()
     create_revenue_view()
+    create_restock_tables()
