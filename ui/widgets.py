@@ -1,8 +1,9 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
-from PySide6.QtCore import QDate, QStringListModel, QTimer, Qt
+from PySide6.QtCore import QDate, QStringListModel, QTimer
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
 from logic.restock import get_current_batch, add_request_item, get_part_id_by_sku
+import traceback
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -220,7 +221,6 @@ class request_page(QWidget):
         self.reset_table = QPushButton("Reset Table")
         self.request_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
 
-
         button_container = QWidget()
         horizontal_layout = QHBoxLayout(button_container)
         horizontal_layout.addWidget(self.input_button)
@@ -256,12 +256,14 @@ class request_page(QWidget):
         try:
             batch_id = get_current_batch()
         except (RuntimeError) as e:
+            traceback.print_exc()
             QMessageBox.critical(self, "ERROR:", str(e))
             return
 
         try:
             add_request_item(batch_id, part_id, quantity, "PENDING", "")
         except (RuntimeError) as e:
+            traceback.print_exc()
             QMessageBox.critical(self, "ERROR:", str(e))
         else:
             QMessageBox.information(self, "Item Submitted to DB", "Action Completed Successfully") 
