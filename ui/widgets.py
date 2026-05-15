@@ -181,7 +181,6 @@ class restock_page(QWidget):
     def __init__(self, label):
         super().__init__()
         form_layout = QFormLayout()
-        # horizontal_layout = 
         section_label = QLabel(label)
 
         self.sku_input = QLineEdit()
@@ -219,7 +218,9 @@ class request_page(QWidget):
         self.input_button = QPushButton("Submit")
         self.input_button.clicked.connect(self.handle_submit)
         self.reset_table = QPushButton("Reset Table")
+        
         self.request_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
+        self.refresh_request_table()
 
         button_container = QWidget()
         horizontal_layout = QHBoxLayout(button_container)
@@ -239,6 +240,10 @@ class request_page(QWidget):
         self.qty_input.setSingleStep(1)
 
         self.setLayout(form_layout)
+
+    def refresh_request_table(self):
+        query_result = query_request_item_table()
+        self.populate_request_item_table(query_result)
 
     def handle_submit(self):
         sku = self.sku_input.text().strip()
@@ -262,14 +267,13 @@ class request_page(QWidget):
 
         try:
             add_request_item(batch_id, part_id, quantity, "PENDING", "")
-            query_result = query_request_item_table()
+            self.refresh_request_table()
         except (RuntimeError) as e:
             traceback.print_exc()
             QMessageBox.critical(self, "ERROR:", str(e))
         else:
             QMessageBox.information(self, "Item Submitted to DB", "Action Completed Successfully") 
         
-        self.populate_request_item_table(query_result)
         
     def populate_request_item_table(self, query_result):
         print(type(query_result))
