@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QL
 from PySide6.QtCore import QDate, QStringListModel, QTimer
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
-from logic.restock import get_current_batch, add_request_item, get_part_id_by_sku
+from logic.restock import get_current_batch, add_request_item, get_part_id_by_sku, query_request_item_table
 import traceback
 
 class InputWidget(QWidget):
@@ -262,11 +262,21 @@ class request_page(QWidget):
 
         try:
             add_request_item(batch_id, part_id, quantity, "PENDING", "")
+            query_result = query_request_item_table()
         except (RuntimeError) as e:
             traceback.print_exc()
             QMessageBox.critical(self, "ERROR:", str(e))
         else:
             QMessageBox.information(self, "Item Submitted to DB", "Action Completed Successfully") 
+        
+        self.populate_request_item_table(query_result)
+        
+    def populate_request_item_table(self, query_result):
+        print(type(query_result))
+        self.request_table.setRowCount(0)
+        self.request_table.setRowCount(len(query_result))
 
-
-
+        for row_idx, row_data in enumerate(query_result):
+            for col_idx, value in enumerate(row_data):
+                item = QTableWidgetItem(str(value))
+                self.request_table.setItem(row_idx, col_idx, item)

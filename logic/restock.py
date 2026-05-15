@@ -93,4 +93,29 @@ def add_request_item(batch_id, part_id, quantity, status, notes):
 
         except sqlite3.Error as e:
             raise RuntimeError(f"Cannot Insert into DB: {e}") from e           
+
+def query_request_item_table():
+
+        select_query = """
+            SELECT
+                p.sku,
+                p.part_name,
+                ri.quantity_requested,
+                p.base_cost_price,
+                (ri.quantity_requested * p.base_cost_price) AS total,
+                ri.batch_id,
+                ri.urgency_score
+            FROM request_items ri
+            INNER JOIN parts p ON ri.part_id = p.id
+            """
+
+        try:
+            with sqlite3.connect(DB) as conn:
+                cursor = conn.cursor()
+                cursor.execute(select_query)
+                query_result = cursor.fetchall()
+                return query_result
+
+        except sqlite3.Error as e:
+             raise RuntimeError(f"Select Query Failed: {e}")
         
