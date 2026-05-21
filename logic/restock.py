@@ -44,8 +44,8 @@ def create_batch(conn):
     print(f"New Request Batch Created: Batch #{batch_id}")
     return batch_id
 
-def get_current_batch():
-    # fetches the most recent open OPEN batch. If none exists, create one
+def fetch_most_recent_batch():
+    # fetches the most recent OPEN batch. If none exists, create one
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 

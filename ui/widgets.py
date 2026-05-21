@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QL
 from PySide6.QtCore import QDate, QStringListModel, QTimer
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
-from logic.restock import get_current_batch, add_request_item, get_part_id_by_sku, query_request_item_table
+from logic.restock import fetch_most_recent_batch, add_request_item, get_part_id_by_sku, query_request_item_table
 import traceback
 
 class InputWidget(QWidget):
@@ -265,7 +265,7 @@ class request_page(QWidget):
             return
 
         try:
-            batch_id = get_current_batch()
+            batch_id = fetch_most_recent_batch()
         except (RuntimeError) as e:
             traceback.print_exc()
             QMessageBox.critical(self, "ERROR:", str(e))
