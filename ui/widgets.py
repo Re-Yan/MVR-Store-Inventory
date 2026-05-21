@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView, QTreeWidget
 from PySide6.QtCore import QDate, QStringListModel, QTimer
 from datetime import datetime
 from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
@@ -131,6 +131,12 @@ class SectionTable(QTableWidget):
         super().__init__()
         self.setColumnCount(len(headers))
         self.setHorizontalHeaderLabels(headers)
+
+class restockTree(QTreeWidget):
+    def __init__(self):
+        super().__init__()
+        self.setColumnCount(4)
+        self.setHeaderLabels(["Batch/Item", "Created_On", "Status", "Quantity"])
 
 class transaction_page(QWidget):
     def __init__(self, label):
