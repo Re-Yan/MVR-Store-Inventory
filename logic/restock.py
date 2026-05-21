@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from datetime import datetime
+from itertools import groupby
 
 DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
 
@@ -119,3 +120,28 @@ def query_request_item_table():
         except sqlite3.Error as e:
              raise RuntimeError(f"Select Query Failed: {e}")
         
+def get_restock_batches(self):
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+
+        select_query = """
+            SELECT b.id, b.created_on, b.status,
+            i.id, p.sku, p.part_name, i.quantity_requested, i.created_on
+            FROM restock_batches b
+            LEFT JOIN request_items i ON i.batch_id = b.id
+            LEFT JOIN parts p ON i.part_id = p.id
+            ORDER BY b.id DESC, i.id ASC;
+        """
+
+        cursor.execute(select_query)
+        # the result set from the query will become the row to be grouped
+        rows = cursor.fetchall()
+
+        grouped = []
+        for batch_id, group in groupby(rows, key=lambda r: r[0]):
+            rows_for_batch = list(group)
+            batch_tuple = rows_for_batch[0][:3]              # b.id, created_on, status
+            items = [r[3:] for r in rows_for_batch if r[3]]  # drop NULL placeholder
+            grouped.append((batch_tuple, items))
+        # returns batch info in proper hierarchical tuple format
+        return grouped
