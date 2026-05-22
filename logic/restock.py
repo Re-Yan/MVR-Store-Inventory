@@ -120,7 +120,7 @@ def query_request_item_table():
         except sqlite3.Error as e:
              raise RuntimeError(f"Select Query Failed: {e}")
         
-def get_restock_batches(self):
+def get_restock_batches():
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
