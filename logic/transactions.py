@@ -87,8 +87,8 @@ def query_transaction_date(date_string, parent=None):
 
             if not results:
                 raise ValueError(f"No transactions found for date: {date_string}")
-        
         return results
+
     except sqlite3.Error as e:
         raise RuntimeError(f"Database Query failed: {e}") from e
 
@@ -108,7 +108,6 @@ def insert_transaction(date, quantity, sku, price):
     
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
-        
         # try and except clause for the select query
         try:
             cursor.execute(select_query, (sku,))
@@ -116,7 +115,6 @@ def insert_transaction(date, quantity, sku, price):
             
             if select_result  is None:
                 raise ValueError(f"ERROR: {sku} Not Found in Parts Table")
-            
             part_name, cost_price = select_result
 
         except sqlite3.Error as e:
