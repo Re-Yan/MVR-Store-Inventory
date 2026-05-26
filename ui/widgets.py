@@ -1,9 +1,47 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton, QLabel, QDateEdit, QTableWidget, QTableWidgetItem, QMessageBox, QSpinBox, QDoubleSpinBox, QListView, QTreeWidget
-from PySide6.QtCore import QDate, QStringListModel, QTimer
+from PySide6.QtWidgets import (
+    QWidget, 
+    QVBoxLayout, 
+    QHBoxLayout, 
+    QFormLayout, 
+    QLineEdit, 
+    QPushButton, 
+    QLabel, 
+    QDateEdit, 
+    QTableWidget, 
+    QTableWidgetItem, 
+    QMessageBox, 
+    QSpinBox, 
+    QDoubleSpinBox, 
+    QListView, 
+    QTreeWidget, 
+    QTreeWidgetItem 
+)
+
+from PySide6.QtCore import (
+    Qt, 
+    QDate, 
+    QStringListModel, 
+    QTimer 
+)
+
 from datetime import datetime
-from logic.transactions import query_transaction_date, insert_transaction, search_suggestions
-from logic.restock import fetch_most_recent_batch, add_request_item, get_part_id_by_sku, query_request_item_table
+from logic.transactions import ( 
+    query_transaction_date, 
+    insert_transaction, 
+    search_suggestions 
+)
+
+from logic.restock import (
+    fetch_most_recent_batch, 
+    add_request_item, 
+    get_part_id_by_sku, 
+    query_request_item_table, 
+    get_restock_batches 
+)
+
 import traceback
+
+# CLASSES
 
 class InputWidget(QWidget):
     def __init__(self, text, buttonText):
@@ -193,14 +231,14 @@ class restock_page(QWidget):
         self.sku_input.setPlaceholderText("Enter Item Code")
         self.qty_input = QSpinBox()
         self.submit_button = QPushButton("Submit")
-        self.restock_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number"])
+        self.tree = restockTree()
         self.finalize_button = QPushButton("Finalize Restock")
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
         form_layout.addRow(self.submit_button)
-        form_layout.addRow(self.restock_table)
+        form_layout.addRow(self.tree)
         form_layout.addRow(self.finalize_button)
 
         # Quantity Widget Settings
@@ -209,7 +247,32 @@ class restock_page(QWidget):
         self.qty_input.setMinimum(1)
         self.qty_input.setSingleStep(1)
 
+        self.refresh_restock_tree()
+
         self.setLayout(form_layout)
+
+    def refresh_restock_tree(self):
+        batch_and_item_group = get_restock_batches()
+        self.populate_tree(batch_and_item_group)
+
+    def populate_tree(self, group):
+        self.tree.clear()
+        for batch_tuple, items in group:                 # outer loop: batches
+    
+            batch_id, created_on, status = batch_tuple
+            parent = QTreeWidgetItem(self.tree)
+            parent.setText(0, f"Batch #{batch_id}")
+            parent.setText(1, created_on)
+            parent.setText(2, status)
+            parent.setData(0, Qt.UserRole, batch_id)
+
+            for item in items:                             # inner loop: children
+                item_id, sku, part_name, qty, item_created = item
+                child = QTreeWidgetItem(parent)
+                child.setText(0, sku)
+                child.setText(1, part_name)
+                child.setText(3, str(qty))
+                child.setData(0, Qt.UserRole, item_id)
 
 class request_page(QWidget):
     def __init__(self, label):
@@ -274,6 +337,8 @@ class request_page(QWidget):
         try:
             add_request_item(batch_id, part_id, quantity, "PENDING", "")
             self.refresh_request_table()
+            # call refresh_restock_tree() function
+            
         except (RuntimeError) as e:
             traceback.print_exc()
             QMessageBox.critical(self, "ERROR:", str(e))
@@ -282,6 +347,7 @@ class request_page(QWidget):
         
         
     def populate_request_item_table(self, query_result):
+    
         print(type(query_result))
         self.request_table.setRowCount(0)
         self.request_table.setRowCount(len(query_result))
