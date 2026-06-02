@@ -173,8 +173,8 @@ class SectionTable(QTableWidget):
 class restockTree(QTreeWidget):
     def __init__(self):
         super().__init__()
-        self.setColumnCount(4)
-        self.setHeaderLabels(["Batch/Item", "Created_On", "Status", "Quantity"])
+        self.setColumnCount(3)
+        self.setHeaderLabels(["Batch/Item", "Created_On", "Status"])
 
 class transaction_page(QWidget):
     def __init__(self, label):
@@ -231,14 +231,14 @@ class restock_page(QWidget):
         self.sku_input.setPlaceholderText("Enter Item Code")
         self.qty_input = QSpinBox()
         self.submit_button = QPushButton("Submit")
-        self.tree = restockTree()
+        self.request_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
         self.finalize_button = QPushButton("Finalize Restock")
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
         form_layout.addRow(self.submit_button)
-        form_layout.addRow(self.tree)
+        form_layout.addRow(self.request_table)
         form_layout.addRow(self.finalize_button)
 
         # Quantity Widget Settings
@@ -247,32 +247,25 @@ class restock_page(QWidget):
         self.qty_input.setMinimum(1)
         self.qty_input.setSingleStep(1)
 
-        self.refresh_restock_tree()
+        self.refresh_request_table()
 
         self.setLayout(form_layout)
 
-    def refresh_restock_tree(self):
-        batch_and_item_group = get_restock_batches()
-        self.populate_tree(batch_and_item_group)
-
-    def populate_tree(self, group):
-        self.tree.clear()
-        for batch_tuple, items in group:                 # outer loop: batches
+    def refresh_request_table(self):
+        query_result = query_request_item_table()
+        self.populate_request_item_table(query_result)
     
-            batch_id, created_on, status = batch_tuple
-            parent = QTreeWidgetItem(self.tree)
-            parent.setText(0, f"Batch #{batch_id}")
-            parent.setText(1, created_on)
-            parent.setText(2, status)
-            parent.setData(0, Qt.UserRole, batch_id)
+    def populate_request_item_table(self, query_result):
+    
+        print(type(query_result))
+        self.request_table.setRowCount(0)
+        self.request_table.setRowCount(len(query_result))
 
-            for item in items:                             # inner loop: children
-                item_id, sku, part_name, qty, item_created = item
-                child = QTreeWidgetItem(parent)
-                child.setText(0, sku)
-                child.setText(1, part_name)
-                child.setText(3, str(qty))
-                child.setData(0, Qt.UserRole, item_id)
+        for row_idx, row_data in enumerate(query_result):
+            for col_idx, value in enumerate(row_data):
+                item = QTableWidgetItem(str(value))
+                self.request_table.setItem(row_idx, col_idx, item)
+
 
 class request_page(QWidget):
     def __init__(self, label):
@@ -284,12 +277,11 @@ class request_page(QWidget):
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
         self.qty_input = QSpinBox()
+        self.tree = restockTree()
         self.input_button = QPushButton("Submit")
         self.input_button.clicked.connect(self.handle_submit)
         self.reset_table = QPushButton("Reset Table")
         
-        self.request_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
-        self.refresh_request_table()
 
         button_container = QWidget()
         horizontal_layout = QHBoxLayout(button_container)
@@ -300,7 +292,7 @@ class request_page(QWidget):
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
         form_layout.addRow(button_container)
-        form_layout.addRow(self.request_table)
+        form_layout.addRow(self.tree)
 
         # Quantity Widget Settings
         self.qty_input.setRange(0, 100)
@@ -308,11 +300,10 @@ class request_page(QWidget):
         self.qty_input.setMinimum(1)
         self.qty_input.setSingleStep(1)
 
+        self.refresh_restock_tree()
         self.setLayout(form_layout)
 
-    def refresh_request_table(self):
-        query_result = query_request_item_table()
-        self.populate_request_item_table(query_result)
+
 
     def handle_submit(self):
         sku = self.sku_input.text().strip()
@@ -336,23 +327,35 @@ class request_page(QWidget):
 
         try:
             add_request_item(batch_id, part_id, quantity, "PENDING", "")
-            self.refresh_request_table()
-            # call refresh_restock_tree() function
+            self.refresh_restock_tree()
             
         except (RuntimeError) as e:
             traceback.print_exc()
             QMessageBox.critical(self, "ERROR:", str(e))
         else:
             QMessageBox.information(self, "Item Submitted to DB", "Action Completed Successfully") 
-        
-        
-    def populate_request_item_table(self, query_result):
-    
-        print(type(query_result))
-        self.request_table.setRowCount(0)
-        self.request_table.setRowCount(len(query_result))
 
-        for row_idx, row_data in enumerate(query_result):
-            for col_idx, value in enumerate(row_data):
-                item = QTableWidgetItem(str(value))
-                self.request_table.setItem(row_idx, col_idx, item)
+    def refresh_restock_tree(self):
+        batch_and_item_group = get_restock_batches()
+        self.populate_tree(batch_and_item_group)
+
+    def populate_tree(self, group):
+        self.tree.clear()
+        for batch_tuple, items in group:                 # outer loop: batches
+    
+            batch_id, created_on, status = batch_tuple
+            parent = QTreeWidgetItem(self.tree)
+            parent.setText(0, f"Batch #{batch_id}")
+            parent.setText(1, created_on)
+            parent.setText(2, status)
+            parent.setData(0, Qt.UserRole, batch_id)
+
+            for item in items:                             # inner loop: children
+                item_id, sku, part_name, qty, item_created = item
+                child = QTreeWidgetItem(parent)
+                child.setText(0, sku)
+                child.setText(1, part_name)
+                child.setText(3, str(qty))
+                child.setData(0, Qt.UserRole, item_id)
+        
+        
