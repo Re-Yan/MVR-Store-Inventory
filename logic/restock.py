@@ -70,21 +70,20 @@ def fetch_most_recent_batch():
         except sqlite3.Error as e:
             raise RuntimeError(f"cannot get batch data: {e}") from e
 
-def add_request_item(batch_id, part_id, quantity, status, notes):
+def add_request_item(batch_id, part_id, status, notes):
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
         curr_date = get_curr_date()
 
         insert_request_item = """
-            INSERT INTO request_items (batch_id, part_id, quantity_requested, urgency_score, status, created_on, date_carried_over, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO request_items (batch_id, part_id, urgency_score, status, created_on, date_carried_over, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         try:
             cursor.execute(insert_request_item, (
                 batch_id,
                 part_id,
-                quantity,
                 1,
                 status,
                 curr_date,
@@ -101,9 +100,7 @@ def query_request_item_table():
             SELECT
                 p.sku,
                 p.part_name,
-                ri.quantity_requested,
                 p.base_cost_price,
-                (ri.quantity_requested * p.base_cost_price) AS total,
                 ri.batch_id,
                 ri.urgency_score
             FROM request_items ri
@@ -126,7 +123,7 @@ def get_restock_batches():
 
         select_query = """
             SELECT b.id, b.created_on, b.status,
-            i.id, p.sku, p.part_name, i.quantity_requested, i.created_on
+            i.id, p.sku, p.part_name, i.created_on
             FROM restock_batches b
             LEFT JOIN request_items i ON i.batch_id = b.id
             LEFT JOIN parts p ON i.part_id = p.id

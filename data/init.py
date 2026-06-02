@@ -200,7 +200,6 @@ def create_restock_tables():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 batch_id INTEGER NOT NULL, 
                 part_id INTEGER NOT NULL,
-                quantity_requested INTEGER,
                 urgency_score INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'PENDING'
                     CHECK(status IN ('PENDING', 'PROCURED', 'CARRIED OVER')),

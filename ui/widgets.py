@@ -276,7 +276,6 @@ class request_page(QWidget):
 
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
-        self.qty_input = QSpinBox()
         self.tree = restockTree()
         self.input_button = QPushButton("Submit")
         self.input_button.clicked.connect(self.handle_submit)
@@ -290,15 +289,8 @@ class request_page(QWidget):
 
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
-        form_layout.addRow("Quantity:", self.qty_input)
         form_layout.addRow(button_container)
         form_layout.addRow(self.tree)
-
-        # Quantity Widget Settings
-        self.qty_input.setRange(0, 100)
-        self.qty_input.setValue(1)
-        self.qty_input.setMinimum(1)
-        self.qty_input.setSingleStep(1)
 
         self.refresh_restock_tree()
         self.setLayout(form_layout)
@@ -307,7 +299,6 @@ class request_page(QWidget):
 
     def handle_submit(self):
         sku = self.sku_input.text().strip()
-        quantity = self.qty_input.value()
 
         if not sku:
             QMessageBox.warning(self, "Input Error", "SKU cannot be empty.")
@@ -326,7 +317,7 @@ class request_page(QWidget):
             return
 
         try:
-            add_request_item(batch_id, part_id, quantity, "PENDING", "")
+            add_request_item(batch_id, part_id, "PENDING", "")
             self.refresh_restock_tree()
             
         except (RuntimeError) as e:
