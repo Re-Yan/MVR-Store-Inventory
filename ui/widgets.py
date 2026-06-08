@@ -342,11 +342,10 @@ class request_page(QWidget):
             parent.setData(0, Qt.UserRole, batch_id)
 
             for item in items:                             # inner loop: children
-                item_id, sku, part_name, qty, item_created = item
+                item_id, sku, part_name, item_created = item
                 child = QTreeWidgetItem(parent)
                 child.setText(0, sku)
                 child.setText(1, part_name)
-                child.setText(3, str(qty))
                 child.setData(0, Qt.UserRole, item_id)
         
         
