@@ -220,9 +220,9 @@ class restock_page(QWidget):
         left_layout = QFormLayout(left_panel)
         left_label = QLabel("ADD REQUEST")
         self.sku_input = QLineEdit()
-        self.sku_input.placeholderText("Enter Item Code")
+        self.sku_input.setPlaceholderText("Enter Item Code")
         self.supplier_input = QLineEdit()
-        self.supplier_input.placeholderText("Enter Supplier Name")
+        self.supplier_input.setPlaceholderText("Enter Supplier Name")
         # TO DO: Urgency and Notes Display
         add_button = QPushButton("Add +")
 

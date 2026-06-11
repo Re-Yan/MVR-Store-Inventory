@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
         
         transaction_section = transaction_page("Transaction Search")
         log_section = LogSection("Log Section")
-        restock_section = restock_page("Restock Section")
+        restock_section = restock_page()
         request_section = request_page("Request List")
         
         # Create a callback that fills the SKU field when a suggestion is selected
