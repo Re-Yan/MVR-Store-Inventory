@@ -43,19 +43,7 @@ import traceback
 
 # CLASSES
 
-class InputWidget(QWidget):
-    def __init__(self, text, buttonText):
-        super().__init__()
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-        self.resize(600, 400)
 
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText(text)
-
-        self.input_button = QPushButton(buttonText)
-        layout.addWidget(self.input_field)
-        layout.addWidget(self.input_button)
 
 class LogSection(QWidget):
     def __init__(self, label):
