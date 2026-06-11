@@ -19,8 +19,17 @@ def mark_batch_ordered(id, date):
 def mark_batch_completed():
     pass
 
-def mark_item_procured():
-    pass
+def mark_item_procured(part_id):
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+
+        item_procured_update = """
+        UPDATE request_items
+        SET status = 'PROCURED'
+        WHERE part_id = ? AND status = 'PENDING'
+        """
+
+        cursor.execute(item_procured_update, (part_id,))
 
 def mark_item_carried_over():
     pass
