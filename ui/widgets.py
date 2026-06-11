@@ -210,50 +210,31 @@ class transaction_page(QWidget):
         self.populate_table(results)
 
 class restock_page(QWidget):
-    def __init__(self, label):
+    def __init__(self):
         super().__init__()
-        form_layout = QFormLayout()
-        section_label = QLabel(label)
 
+        main_layout = QHBoxLayout(self)
+
+        # LEFT PANEL COMPONENTS
+        left_panel = QWidget()
+        left_layout = QFormLayout(left_panel)
+        left_label = QLabel("ADD REQUEST")
         self.sku_input = QLineEdit()
-        self.sku_input.setPlaceholderText("Enter Item Code")
-        self.qty_input = QSpinBox()
-        self.submit_button = QPushButton("Submit")
-        self.request_table = SectionTable(["SKU", "Part Name", "Quantity", "Base Cost Price", "Total", "Restock Number", "Urgency"])
-        self.finalize_button = QPushButton("Finalize Restock")
+        self.sku_input.placeholderText("Enter Item Code")
+        self.supplier_input = QLineEdit()
+        self.supplier_input.placeholderText("Enter Supplier Name")
+        # TO DO: Urgency and Notes Display
+        add_button = QPushButton("Add +")
 
-        form_layout.addRow(section_label)
-        form_layout.addRow("SKU:", self.sku_input)
-        form_layout.addRow("Quantity:", self.qty_input)
-        form_layout.addRow(self.submit_button)
-        form_layout.addRow(self.request_table)
-        form_layout.addRow(self.finalize_button)
-
-        # Quantity Widget Settings
-        self.qty_input.setRange(0, 100)
-        self.qty_input.setValue(1)
-        self.qty_input.setMinimum(1)
-        self.qty_input.setSingleStep(1)
-
-        self.refresh_request_table()
-
-        self.setLayout(form_layout)
-
-    def refresh_request_table(self):
-        query_result = query_request_item_table()
-        self.populate_request_item_table(query_result)
-    
-    def populate_request_item_table(self, query_result):
-    
-        print(type(query_result))
-        self.request_table.setRowCount(0)
-        self.request_table.setRowCount(len(query_result))
-
-        for row_idx, row_data in enumerate(query_result):
-            for col_idx, value in enumerate(row_data):
-                item = QTableWidgetItem(str(value))
-                self.request_table.setItem(row_idx, col_idx, item)
-
+        left_layout.addRow(left_label)
+        left_layout.addRow("SKU", self.sku_input)
+        left_layout.addRow("Supplier", self.supplier_input)
+        left_layout.addRow(add_button)
+        
+        # RIGHT PANEL COMPONENTS
+        right_panel = QWidget()
+        right_layout = QVBoxLayout()
+        
 
 class request_page(QWidget):
     def __init__(self, label):
