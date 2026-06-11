@@ -234,6 +234,8 @@ class restock_page(QWidget):
         # RIGHT PANEL COMPONENTS
         right_panel = QWidget()
         right_layout = QVBoxLayout()
+
+        main_layout.addWidget(left_panel)
         
 
 class request_page(QWidget):
