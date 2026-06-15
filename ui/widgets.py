@@ -226,12 +226,17 @@ class restock_page(QWidget):
         panel = QWidget()
         left_layout = QFormLayout(panel)
         left_label = QLabel("ADD REQUEST")
+
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
+
         self.supplier_input = QLineEdit()
         self.supplier_input.setPlaceholderText("Enter Supplier Name")
+
         # TO DO: Urgency and Notes Display
         add_button = QPushButton("Add +")
+        # TO DO: error handling for blank supplier
+        add_button.clicked.connect(self.handle_add_item)
 
         left_layout.addRow(left_label)
         left_layout.addRow("SKU", self.sku_input)
@@ -298,7 +303,19 @@ class restock_page(QWidget):
             self.batch_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             # cols 0/3/4 (Status, Supplier, Action) left blank — steps 2/4/5
 
-            
+    def add_item(self, sku, supp): 
+        item_id = get_part_id_by_sku(sku)
+        batch_id = fetch_most_recent_batch()
+        supplier = supp
+
+        add_request_item(batch_id, item_id, "PENDING", "")
+
+    def handle_add_item(self):
+        sku = self.sku_input.text().strip()            
+        supplier = self.supplier_input.text().strip()
+
+        self.add_item(sku, supplier)
+        self.refresh_item_table()
         
 
 class request_page(QWidget):
