@@ -215,9 +215,16 @@ class restock_page(QWidget):
 
         main_layout = QHBoxLayout(self)
 
-        # LEFT PANEL COMPONENTS
-        left_panel = QWidget()
-        left_layout = QFormLayout(left_panel)
+        self.left_panel = self.build_left_panel()
+        self.right_panel = self.build_right_panel()
+
+        main_layout.addWidget(self.left_panel, 1)
+        main_layout.addWidget(self.right_panel, 2)
+        self.refresh_item_table()
+
+    def build_left_panel(self):
+        panel = QWidget()
+        left_layout = QFormLayout(panel)
         left_label = QLabel("ADD REQUEST")
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
@@ -230,12 +237,68 @@ class restock_page(QWidget):
         left_layout.addRow("SKU", self.sku_input)
         left_layout.addRow("Supplier", self.supplier_input)
         left_layout.addRow(add_button)
-        
-        # RIGHT PANEL COMPONENTS
-        right_panel = QWidget()
-        right_layout = QVBoxLayout()
 
-        main_layout.addWidget(left_panel)
+        return panel
+
+
+    def build_right_panel(self):
+            panel = QWidget()
+            right_layout = QVBoxLayout()
+            self.batch_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Action"])
+            
+            right_layout.addWidget(self.build_header_batch())
+            right_layout.addWidget(self.batch_table)
+            panel.setLayout(right_layout)
+
+            return panel
+    
+    def build_header_batch(self):
+        header = QWidget()
+        header_layout = QVBoxLayout(header)
+
+        # ── meta line: which batch, created date, status ──
+        self.batch_label   = QLabel("Batch —")
+        self.batch_created = QLabel("created —")
+        self.batch_status  = QLabel("status: —")
+
+        meta_row = QHBoxLayout()
+        meta_row.addWidget(self.batch_label)
+        meta_row.addWidget(self.batch_created)
+        meta_row.addWidget(self.batch_status)
+        meta_row.addStretch()                       # keep labels left, soak up extra width
+
+        # ── batch-level actions (inert in step 1) ──
+        self.order_button    = QPushButton("Order Batch")
+        self.complete_button = QPushButton("Complete Batch")
+        self.order_button.setEnabled(False)
+        self.complete_button.setEnabled(False)
+
+        button_row = QHBoxLayout()
+        button_row.addWidget(self.order_button)
+        button_row.addWidget(self.complete_button)
+        button_row.addStretch()
+
+        header_layout.addLayout(meta_row)
+        header_layout.addLayout(button_row)
+
+        return header
+    
+    def refresh_item_table(self):
+        rows = query_request_item_table()       # (sku, part_name, base_cost_price, batch_id, urgency_score)
+        self.populate_item_table(rows)
+
+    def populate_item_table(self, rows):
+        self.batch_table.setRowCount(0)
+        self.batch_table.setRowCount(len(rows))
+
+        # columns: 0 Status | 1 SKU | 2 Part | 3 Supplier | 4 Action
+        for r, row in enumerate(rows):
+            sku, part_name = row[0], row[1]
+            self.batch_table.setItem(r, 1, QTableWidgetItem(str(sku)))
+            self.batch_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
+            # cols 0/3/4 (Status, Supplier, Action) left blank — steps 2/4/5
+
+            
         
 
 class request_page(QWidget):
