@@ -25,6 +25,11 @@ from PySide6.QtCore import (
     QTimer 
 )
 
+from PySide6.QtGui import (
+    QColor,
+    QBrush
+)
+
 from datetime import datetime
 from logic.transactions import ( 
     query_transaction_date, 
@@ -42,9 +47,13 @@ from logic.restock import (
 
 import traceback
 
+STATUS_COLORS = {
+    "PENDING":      QColor("#b58900"),
+    "PROCURED":     QColor("#2aa198"),
+    "CARRIED OVER": QColor("#888888"),
+}
+
 # CLASSES
-
-
 
 class LogSection(QWidget):
     def __init__(self, label):
@@ -301,7 +310,9 @@ class restock_page(QWidget):
 
         for r, row in enumerate(rows):
             item_id, status, sku, part_name, supplier = row[0], row[1], row[2], row[3], row[4]
-            self.batch_table.setItem(r, 0, QTableWidgetItem(str(status)))
+            status_item = QTableWidgetItem(str(status))
+            status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
+            self.batch_table.setItem(r, 0, status_item)
             self.batch_table.setItem(r, 1, QTableWidgetItem(str(sku)))
             self.batch_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.batch_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
