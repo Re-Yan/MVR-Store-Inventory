@@ -292,19 +292,20 @@ class restock_page(QWidget):
         return header
     
     def refresh_item_table(self):
-        rows = query_request_item_table()       # (sku, part_name, base_cost_price, batch_id, urgency_score)
+        rows = query_request_item_table()       # (id, status, sku, part_name, supplier)
         self.populate_item_table(rows)
 
     def populate_item_table(self, rows):
         self.batch_table.setRowCount(0)
         self.batch_table.setRowCount(len(rows))
 
-        # columns: 0 Status | 1 SKU | 2 Part | 3 Supplier | 4 Action
         for r, row in enumerate(rows):
-            sku, part_name = row[0], row[1]
+            item_id, status, sku, part_name, supplier = row[0], row[1], row[2], row[3], row[4]
+            self.batch_table.setItem(r, 0, QTableWidgetItem(str(status)))
             self.batch_table.setItem(r, 1, QTableWidgetItem(str(sku)))
             self.batch_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
-            # cols 0/3/4 (Status, Supplier, Action) left blank — steps 2/4/5
+            self.batch_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
+            # Col 4 Action
 
     def add_item(self, sku, supp): 
         item_id = get_part_id_by_sku(sku)

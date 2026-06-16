@@ -97,14 +97,14 @@ def add_request_item(batch_id, part_id, status, notes):
 def query_request_item_table():
 
         select_query = """
-            SELECT
-                p.sku,
-                p.part_name,
-                p.base_cost_price,
-                ri.batch_id,
-                ri.urgency_score
-            FROM request_items ri
-            INNER JOIN parts p ON ri.part_id = p.id
+        SELECT
+            ri.id,
+            ri.status,
+            p.sku,
+            p.part_name,
+            ri.supplier
+        FROM request_items ri
+        INNER JOIN parts p ON ri.part_id = p.id
             """
 
         try:
