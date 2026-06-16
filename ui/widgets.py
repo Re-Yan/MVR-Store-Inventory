@@ -307,18 +307,18 @@ class restock_page(QWidget):
             self.batch_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
             # Col 4 Action
 
-    def add_item(self, sku, supp): 
+    def add_item(self): 
+        sku = self.sku_input.text().strip()            
         item_id = get_part_id_by_sku(sku)
         batch_id = fetch_most_recent_batch()
-        supplier = supp
+        supplier = self.supplier_input.text().strip()
+        notes = self.notes_input.toPlainText().strip()
 
-        add_request_item(batch_id, item_id, "PENDING", "")
+        add_request_item(batch_id, item_id, supplier, "PENDING", notes)
 
     def handle_add_item(self):
-        sku = self.sku_input.text().strip()            
-        supplier = self.supplier_input.text().strip()
 
-        self.add_item(sku, supplier)
+        self.add_item()
         self.refresh_item_table()
         
 

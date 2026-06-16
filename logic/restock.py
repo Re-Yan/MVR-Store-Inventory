@@ -70,20 +70,21 @@ def fetch_most_recent_batch():
         except sqlite3.Error as e:
             raise RuntimeError(f"cannot get batch data: {e}") from e
 
-def add_request_item(batch_id, part_id, status, notes):
+def add_request_item(batch_id, part_id, supplier, status, notes):
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
         curr_date = get_curr_date()
 
         insert_request_item = """
-            INSERT INTO request_items (batch_id, part_id, urgency_score, status, created_on, date_carried_over, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO request_items (batch_id, part_id, supplier, urgency_score, status, created_on, date_carried_over, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         try:
             cursor.execute(insert_request_item, (
                 batch_id,
                 part_id,
+                supplier,
                 1,
                 status,
                 curr_date,
