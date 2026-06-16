@@ -14,7 +14,8 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox, 
     QListView, 
     QTreeWidget, 
-    QTreeWidgetItem 
+    QTreeWidgetItem,
+    QPlainTextEdit
 )
 
 from PySide6.QtCore import (
@@ -232,8 +233,9 @@ class restock_page(QWidget):
 
         self.supplier_input = QLineEdit()
         self.supplier_input.setPlaceholderText("Enter Supplier Name")
-
-        # TO DO: Urgency and Notes Display
+        self.notes_input = QPlainTextEdit()
+        self.notes_input.setPlaceholderText("Enter Notes (Optional)")
+        # TO DO: Urgency Display
         add_button = QPushButton("Add +")
         # TO DO: error handling for blank supplier
         add_button.clicked.connect(self.handle_add_item)
@@ -241,6 +243,7 @@ class restock_page(QWidget):
         left_layout.addRow(left_label)
         left_layout.addRow("SKU", self.sku_input)
         left_layout.addRow("Supplier", self.supplier_input)
+        left_layout.addRow("Notes", self.notes_input)
         left_layout.addRow(add_button)
 
         return panel
