@@ -246,9 +246,7 @@ class restock_page(QWidget):
         self.supplier_input.setPlaceholderText("Enter Supplier Name")
         self.notes_input = QPlainTextEdit()
         self.notes_input.setPlaceholderText("Enter Notes (Optional)")
-        # TO DO: Urgency Display
         add_button = QPushButton("Add +")
-        # TO DO: error handling for blank supplier
         add_button.clicked.connect(self.handle_add_item)
 
         left_layout.addRow(left_label)
@@ -320,12 +318,7 @@ class restock_page(QWidget):
             self.batch_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
             # Col 4 Action
 
-    def add_item(self, sku, supplier): 
-        item_id = get_part_id_by_sku(sku)
-
-        # Error Handling For Wrong Item Code
-        if not item_id:
-            QMessageBox.warning(self, "UNKNOWN SKU", "NON-EXISTENT ITEM CODE")
+    def add_item(self, item_id, supplier): 
         batch_id = fetch_most_recent_batch()
         notes = self.notes_input.toPlainText().strip()
 
@@ -339,6 +332,13 @@ class restock_page(QWidget):
             QMessageBox.warning(self, "Missing Input", "Please Enter Item Code")
             return
 
+        item_id = get_part_id_by_sku(sku)
+
+        # Error Handling For Wrong Item Code
+        if not item_id:
+            QMessageBox.warning(self, "UNKNOWN SKU", "NON-EXISTENT ITEM CODE")
+            return
+        
         supplier = self.supplier_input.text().strip()
 
         # Error Handling for null supplier
@@ -346,7 +346,7 @@ class restock_page(QWidget):
             QMessageBox.warning(self, "Missing Input", "Please Provide Supplier Name")
             return
 
-        self.add_item(sku, supplier)
+        self.add_item(item_id, supplier)
         self.refresh_item_table()
         
 
