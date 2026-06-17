@@ -322,6 +322,10 @@ class restock_page(QWidget):
 
     def add_item(self, sku, supplier): 
         item_id = get_part_id_by_sku(sku)
+
+        # Error Handling For Wrong Item Code
+        if not item_id:
+            QMessageBox.warning(self, "UNKNOWN SKU", "NON-EXISTENT ITEM CODE")
         batch_id = fetch_most_recent_batch()
         notes = self.notes_input.toPlainText().strip()
 
@@ -329,11 +333,15 @@ class restock_page(QWidget):
 
     def handle_add_item(self):
         sku = self.sku_input.text().strip()            
+
+        # Error Handling for null sku
         if not sku:
             QMessageBox.warning(self, "Missing Input", "Please Enter Item Code")
             return
 
         supplier = self.supplier_input.text().strip()
+
+        # Error Handling for null supplier
         if not supplier:
             QMessageBox.warning(self, "Missing Input", "Please Provide Supplier Name")
             return
