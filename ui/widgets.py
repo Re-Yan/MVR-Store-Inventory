@@ -168,6 +168,8 @@ class SectionTable(QTableWidget):
         self.setColumnCount(len(headers))
         self.setHorizontalHeaderLabels(headers)
 
+        self.setEditTriggers(self.EditTrigger.NoEditTriggers)
+
 class restockTree(QTreeWidget):
     def __init__(self):
         super().__init__()
