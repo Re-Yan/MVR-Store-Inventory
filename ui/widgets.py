@@ -42,7 +42,16 @@ from logic.restock import (
     add_request_item, 
     get_part_id_by_sku, 
     query_request_item_table, 
-    get_restock_batches 
+    get_restock_batches,
+    get_batch,
+    get_request_items_from_batch
+)
+
+from logic.restock_transitions import (
+    mark_batch_completed,
+    mark_batch_ordered,
+    mark_item_procured,
+    mark_item_carried_over
 )
 
 import traceback
@@ -232,7 +241,7 @@ class restock_page(QWidget):
 
         main_layout.addWidget(self.left_panel, 1)
         main_layout.addWidget(self.right_panel, 2)
-        self.refresh_item_table()
+        self.load_batch(fetch_most_recent_batch())
 
     def build_left_panel(self):
         panel = QWidget()
@@ -287,8 +296,8 @@ class restock_page(QWidget):
         # ── batch-level actions (inert in step 1) ──
         self.order_button    = QPushButton("Order Batch")
         self.complete_button = QPushButton("Complete Batch")
-        self.order_button.setEnabled(False)
-        self.complete_button.setEnabled(False)
+        # self.order_button.setEnabled(False)
+        # self.complete_button.setEnabled(False)
 
         button_row = QHBoxLayout()
         button_row.addWidget(self.order_button)
@@ -299,6 +308,9 @@ class restock_page(QWidget):
         header_layout.addLayout(button_row)
 
         return header
+
+        def handle_order_batch(self):
+            pass
     
     def refresh_item_table(self):
         rows = query_request_item_table()       # (id, status, sku, part_name, supplier)
@@ -348,11 +360,25 @@ class restock_page(QWidget):
 
         self.add_item(item_id, supplier)
         self.refresh_item_table()
+
+    def _sync_action_buttons(self, status):
+        self.order_button.setEnabled(status == "OPEN")
+        self.complete_button.setEnabled(status == "COMPLETED")
+
+    def load_batch(self, batch_id):
+        self.batch_id = batch_id
+        b_id, creation_date, status = get_batch(batch_id)
+        self.batch_label.setText(f"Batch # {b_id}")
+        self.batch_created.setText(f"Created {creation_date}")
+        self.batch_status.setText(f"Status {status}")
+        self._sync_action_buttons(status)
+        self.refresh_item_table()
+    
         
 
 class request_page(QWidget):
     def __init__(self, label):
-        super().__init__()
+        super(item_table).__init__()
 
         form_layout = QFormLayout()
         section_label = QLabel(label)

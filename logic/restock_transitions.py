@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from restock import fetch_most_recent_batch
+from logic.restock import fetch_most_recent_batch
 
 DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
 
