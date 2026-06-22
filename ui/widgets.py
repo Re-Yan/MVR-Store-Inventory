@@ -296,8 +296,6 @@ class restock_page(QWidget):
         # ── batch-level actions (inert in step 1) ──
         self.order_button    = QPushButton("Order Batch")
         self.complete_button = QPushButton("Complete Batch")
-        # self.order_button.setEnabled(False)
-        # self.complete_button.setEnabled(False)
 
         button_row = QHBoxLayout()
         button_row.addWidget(self.order_button)
@@ -363,7 +361,7 @@ class restock_page(QWidget):
 
     def _sync_action_buttons(self, status):
         self.order_button.setEnabled(status == "OPEN")
-        self.complete_button.setEnabled(status == "COMPLETED")
+        self.complete_button.setEnabled(status == "ORDERED")
 
     def load_batch(self, batch_id):
         self.batch_id = batch_id
@@ -378,7 +376,7 @@ class restock_page(QWidget):
 
 class request_page(QWidget):
     def __init__(self, label):
-        super(item_table).__init__()
+        super().__init__()
 
         form_layout = QFormLayout()
         section_label = QLabel(label)
