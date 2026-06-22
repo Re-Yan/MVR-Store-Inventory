@@ -26,24 +26,57 @@ def get_part_id_by_sku(sku):
         return part_id[0] if part_id else None
 
 def create_batch(conn):
-    cursor = conn.cursor()
-    curr_date = get_curr_date()
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        curr_date = get_curr_date()
 
-    insert_batch = """
-        INSERT INTO restock_batches (created_on, status, ordered_on, completed_on)
-        VALUES (?, ?, ?, ?)
-    """
-    
-    # Create a Fresh New Request Batch
-    cursor.execute(insert_batch, (
-        curr_date, # date the request batch is created on
-        "OPEN",
-        None,
-        None
-    ))
-    batch_id = cursor.lastrowid # retrieves the id of the INSERT query
-    print(f"New Request Batch Created: Batch #{batch_id}")
-    return batch_id
+        insert_batch = """
+            INSERT INTO restock_batches (created_on, status, ordered_on, completed_on)
+            VALUES (?, ?, ?, ?)
+        """
+        
+        # Create a Fresh New Request Batch
+        cursor.execute(insert_batch, (
+            curr_date, # date the request batch is created on
+            "OPEN",
+            None,
+            None
+        ))
+        batch_id = cursor.lastrowid # retrieves the id of the INSERT query
+        print(f"New Request Batch Created: Batch #{batch_id}")
+        return batch_id
+
+# fetches ONE batch along with its additional info 
+def get_batch(batch_id):
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+
+        query = """
+        SELECT
+            rb.id,
+            rb.created_on,
+            rb.status
+        FROM restock_batches rb
+        WHERE id = ?
+        """
+
+        cursor.execute(query, (batch_id,))
+        return cursor.fetchone()
+
+def get_request_items_from_batch(batch_id):
+    with sqlite3.connect(DB) as conn: 
+        cursor = conn.cursor()
+
+        query = """
+        SELECT
+            ri.id
+        FROM request_items ri
+        WHERE batch_id = ?
+        """
+
+        cursor.execute(query, (batch_id,))
+        # returns all request items from the given batch ID
+        return cursor.fetchall()
 
 def fetch_most_recent_batch():
     # fetches the most recent OPEN batch. If none exists, create one
