@@ -44,7 +44,8 @@ from logic.restock import (
     query_request_item_table, 
     get_restock_batches,
     get_batch,
-    get_request_items_from_batch
+    get_request_items_from_batch,
+    get_curr_date
 )
 
 from logic.restock_transitions import (
@@ -295,6 +296,7 @@ class restock_page(QWidget):
 
         # ── batch-level actions (inert in step 1) ──
         self.order_button    = QPushButton("Order Batch")
+        self.order_button.clicked.connect(self.handle_order_batch)
         self.complete_button = QPushButton("Complete Batch")
 
         button_row = QHBoxLayout()
@@ -307,8 +309,9 @@ class restock_page(QWidget):
 
         return header
 
-        def handle_order_batch(self):
-            pass
+    def handle_order_batch(self):
+        mark_batch_ordered(self.current_batch_id, get_curr_date())
+        self.load_batch(self.current_batch_id)
     
     def refresh_item_table(self):
         rows = query_request_item_table()       # (id, status, sku, part_name, supplier)
@@ -364,7 +367,7 @@ class restock_page(QWidget):
         self.complete_button.setEnabled(status == "ORDERED")
 
     def load_batch(self, batch_id):
-        self.batch_id = batch_id
+        self.current_batch_id = batch_id
         b_id, creation_date, status = get_batch(batch_id)
         self.batch_label.setText(f"Batch # {b_id}")
         self.batch_created.setText(f"Created {creation_date}")
