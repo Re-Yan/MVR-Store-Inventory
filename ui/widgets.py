@@ -332,7 +332,7 @@ class restock_page(QWidget):
             # Col 4 Action
 
     def add_item(self, item_id, supplier): 
-        batch_id = fetch_most_recent_batch()
+        batch_id = self.current_batch_id
         notes = self.notes_input.toPlainText().strip()
 
         add_request_item(batch_id, item_id, supplier, "PENDING", notes)
@@ -360,7 +360,7 @@ class restock_page(QWidget):
             return
 
         self.add_item(item_id, supplier)
-        self.refresh_item_table()
+        self.load_batch(self.current_batch_id)
 
     def _sync_action_buttons(self, status):
         self.order_button.setEnabled(status == "OPEN")
