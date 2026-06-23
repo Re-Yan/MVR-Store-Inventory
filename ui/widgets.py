@@ -41,7 +41,7 @@ from logic.restock import (
     fetch_most_recent_batch, 
     add_request_item, 
     get_part_id_by_sku, 
-    query_request_item_table, 
+    # query_request_item_table, 
     get_restock_batches,
     get_batch,
     get_request_items_from_batch,
@@ -271,10 +271,10 @@ class restock_page(QWidget):
     def build_right_panel(self):
             panel = QWidget()
             right_layout = QVBoxLayout()
-            self.batch_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Action"])
+            self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Action"])
             
             right_layout.addWidget(self.build_header_batch())
-            right_layout.addWidget(self.batch_table)
+            right_layout.addWidget(self.item_table)
             panel.setLayout(right_layout)
 
             return panel
@@ -314,21 +314,21 @@ class restock_page(QWidget):
         self.load_batch(self.current_batch_id)
     
     def refresh_item_table(self):
-        rows = query_request_item_table()       # (id, status, sku, part_name, supplier)
+        rows = get_request_items_from_batch(self.current_batch_id)       # (id, status, sku, part_name, supplier)
         self.populate_item_table(rows)
 
     def populate_item_table(self, rows):
-        self.batch_table.setRowCount(0)
-        self.batch_table.setRowCount(len(rows))
+        self.item_table.setRowCount(0)
+        self.item_table.setRowCount(len(rows))
 
         for r, row in enumerate(rows):
             item_id, status, sku, part_name, supplier = row[0], row[1], row[2], row[3], row[4]
             status_item = QTableWidgetItem(str(status))
             status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
-            self.batch_table.setItem(r, 0, status_item)
-            self.batch_table.setItem(r, 1, QTableWidgetItem(str(sku)))
-            self.batch_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
-            self.batch_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
+            self.item_table.setItem(r, 0, status_item)
+            self.item_table.setItem(r, 1, QTableWidgetItem(str(sku)))
+            self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
+            self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
             # Col 4 Action
 
     def add_item(self, item_id, supplier): 

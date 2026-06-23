@@ -69,9 +69,15 @@ def get_request_items_from_batch(batch_id):
 
         query = """
         SELECT
-            ri.id
+            ri.id,
+            ri.status,
+            p.sku,
+            p.part_name,
+            ri.supplier
         FROM request_items ri
-        WHERE batch_id = ?
+        INNER JOIN parts p
+            ON ri.part_id = p.id
+        WHERE ri.batch_id = ?
         """
 
         cursor.execute(query, (batch_id,))
