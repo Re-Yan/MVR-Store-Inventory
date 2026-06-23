@@ -13,13 +13,10 @@ from PySide6.QtWidgets import (
     QSpinBox, 
     QDoubleSpinBox, 
     QListView, 
-    QTreeWidget, 
-    QTreeWidgetItem,
     QPlainTextEdit
 )
 
 from PySide6.QtCore import (
-    Qt, 
     QDate, 
     QStringListModel, 
     QTimer 
@@ -179,12 +176,6 @@ class SectionTable(QTableWidget):
         self.setHorizontalHeaderLabels(headers)
 
         self.setEditTriggers(self.EditTrigger.NoEditTriggers)
-
-class restockTree(QTreeWidget):
-    def __init__(self):
-        super().__init__()
-        self.setColumnCount(3)
-        self.setHeaderLabels(["Batch/Item", "Created_On", "Status"])
 
 class transaction_page(QWidget):
     def __init__(self, label):
@@ -375,87 +366,3 @@ class restock_page(QWidget):
         self._sync_action_buttons(status)
         self.refresh_item_table()
     
-        
-
-class request_page(QWidget):
-    def __init__(self, label):
-        super().__init__()
-
-        form_layout = QFormLayout()
-        section_label = QLabel(label)
-
-        self.sku_input = QLineEdit()
-        self.sku_input.setPlaceholderText("Enter Item Code")
-        self.tree = restockTree()
-        self.input_button = QPushButton("Submit")
-        self.input_button.clicked.connect(self.handle_submit)
-        self.reset_table = QPushButton("Reset Table")
-        
-
-        button_container = QWidget()
-        horizontal_layout = QHBoxLayout(button_container)
-        horizontal_layout.addWidget(self.input_button)
-        horizontal_layout.addWidget(self.reset_table)
-
-        form_layout.addRow(section_label)
-        form_layout.addRow("SKU:", self.sku_input)
-        form_layout.addRow(button_container)
-        form_layout.addRow(self.tree)
-
-        self.refresh_restock_tree()
-        self.setLayout(form_layout)
-
-
-
-    def handle_submit(self):
-        sku = self.sku_input.text().strip()
-
-        if not sku:
-            QMessageBox.warning(self, "Input Error", "SKU cannot be empty.")
-            return
-        
-        part_id = get_part_id_by_sku(sku)
-        if part_id is None:
-            QMessageBox.warning(self,"SKU Error", f"{sku} not found in the database.")
-            return
-
-        try:
-            batch_id = fetch_most_recent_batch()
-        except (RuntimeError) as e:
-            traceback.print_exc()
-            QMessageBox.critical(self, "ERROR:", str(e))
-            return
-
-        try:
-            add_request_item(batch_id, part_id, "PENDING", "")
-            self.refresh_restock_tree()
-            
-        except (RuntimeError) as e:
-            traceback.print_exc()
-            QMessageBox.critical(self, "ERROR:", str(e))
-        else:
-            QMessageBox.information(self, "Item Submitted to DB", "Action Completed Successfully") 
-
-    def refresh_restock_tree(self):
-        batch_and_item_group = get_restock_batches()
-        self.populate_tree(batch_and_item_group)
-
-    def populate_tree(self, group):
-        self.tree.clear()
-        for batch_tuple, items in group:                 # outer loop: batches
-    
-            batch_id, created_on, status = batch_tuple
-            parent = QTreeWidgetItem(self.tree)
-            parent.setText(0, f"Batch #{batch_id}")
-            parent.setText(1, created_on)
-            parent.setText(2, status)
-            parent.setData(0, Qt.UserRole, batch_id)
-
-            for item in items:                             # inner loop: children
-                item_id, sku, part_name, item_created = item
-                child = QTreeWidgetItem(parent)
-                child.setText(0, sku)
-                child.setText(1, part_name)
-                child.setData(0, Qt.UserRole, item_id)
-        
-        

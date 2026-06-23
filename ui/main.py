@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout,  QHBoxLayout, QStackedWidget, QPushButton 
-from widgets import  LogSection, SearchSection, transaction_page, restock_page, request_page
+from widgets import  LogSection, SearchSection, transaction_page, restock_page 
 
 class MainWindow(QMainWindow):
     def __init__(self):
