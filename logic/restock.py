@@ -25,7 +25,7 @@ def get_part_id_by_sku(sku):
         part_id = cursor.fetchone()
         return part_id[0] if part_id else None
 
-def create_batch(conn):
+def create_batch():
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
         curr_date = get_curr_date()
