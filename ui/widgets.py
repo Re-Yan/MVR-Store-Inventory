@@ -320,7 +320,16 @@ class restock_page(QWidget):
             self.item_table.setItem(r, 1, QTableWidgetItem(str(sku)))
             self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
-            # Col 4 Action
+            if status == "PENDING":
+                receive_button = QPushButton("Receive")
+                receive_button.clicked.connect(
+                    lambda _checked, iid=item_id: self.handle_receive_item(iid)
+                )
+                self.item_table.setCellWidget(r, 4, receive_button)
+
+    def handle_receive_item(self, item_id):
+        mark_item_procured(item_id)
+        self.load_batch(self.current_batch_id)
 
     def add_item(self, item_id, supplier): 
         batch_id = self.current_batch_id
