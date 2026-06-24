@@ -247,14 +247,14 @@ class restock_page(QWidget):
         self.supplier_input.setPlaceholderText("Enter Supplier Name")
         self.notes_input = QPlainTextEdit()
         self.notes_input.setPlaceholderText("Enter Notes (Optional)")
-        add_button = QPushButton("Add +")
-        add_button.clicked.connect(self.handle_add_item)
+        self.add_button = QPushButton("Add +")
+        self.add_button.clicked.connect(self.handle_add_item)
 
         left_layout.addRow(left_label)
         left_layout.addRow("SKU", self.sku_input)
         left_layout.addRow("Supplier", self.supplier_input)
         left_layout.addRow("Notes", self.notes_input)
-        left_layout.addRow(add_button)
+        left_layout.addRow(self.add_button)
 
         return panel
 
@@ -356,6 +356,7 @@ class restock_page(QWidget):
     def _sync_action_buttons(self, status):
         self.order_button.setEnabled(status == "OPEN")
         self.complete_button.setEnabled(status == "ORDERED")
+        self.add_button.setEnabled(status == "OPEN")
 
     def load_batch(self, batch_id):
         self.current_batch_id = batch_id
