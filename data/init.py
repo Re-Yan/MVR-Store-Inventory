@@ -185,30 +185,18 @@ def create_restock_tables():
         cursor.execute("PRAGMA foreign_keys = ON;")
 
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS restock_batches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                created_on TEXT NOT NULL DEFAULT CURRENT_DATE,
-                status TEXT NOT NULL DEFAULT 'OPEN'
-                    CHECK(status IN ('OPEN', 'ORDERED', 'COMPLETED')),
-                ordered_on TEXT,
-                completed_on TEXT
-                )
-                    """)
-        
-        cursor.execute("""
             CREATE TABLE IF NOT EXISTS request_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                batch_id INTEGER NOT NULL, 
                 part_id INTEGER NOT NULL,
                 supplier TEXT, 
                 urgency_score INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'PENDING'
-                    CHECK(status IN ('PENDING', 'PROCURED', 'CARRIED OVER')),
+                    CHECK(status IN ('PENDING', 'ORDERED', 'RECEIVED')),
                 created_on TEXT NOT NULL DEFAULT CURRENT_DATE,
-                date_carried_over TEXT,
+                ordered_on TEXT,
+                received_on TEXT,
                 notes TEXT,
                 
-                FOREIGN KEY (batch_id) REFERENCES restock_batches(id),
                 FOREIGN KEY (part_id) REFERENCES parts(id)
                 )
                     """)
