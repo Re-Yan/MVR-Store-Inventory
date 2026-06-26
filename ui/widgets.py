@@ -35,19 +35,12 @@ from logic.transactions import (
 )
 
 from logic.restock import (
-    fetch_most_recent_batch, 
     add_request_item, 
     get_part_id_by_sku, 
-    # query_request_item_table, 
-    get_restock_batches,
-    get_batch,
-    get_request_items_from_batch,
     get_curr_date
 )
 
 from logic.restock_transitions import (
-    mark_batch_completed,
-    mark_batch_ordered,
     mark_item_procured,
     mark_item_carried_over
 )
@@ -233,7 +226,6 @@ class restock_page(QWidget):
 
         main_layout.addWidget(self.left_panel, 1)
         main_layout.addWidget(self.right_panel, 2)
-        self.load_batch(fetch_most_recent_batch())
 
     def build_left_panel(self):
         panel = QWidget()
@@ -301,12 +293,12 @@ class restock_page(QWidget):
         return header
 
     def handle_order_batch(self):
-        mark_batch_ordered(self.current_batch_id, get_curr_date())
         self.load_batch(self.current_batch_id)
     
     def refresh_item_table(self):
-        rows = get_request_items_from_batch(self.current_batch_id)       # (id, status, sku, part_name, supplier)
-        self.populate_item_table(rows)
+        # rows = get_request_items_from_batch(self.current_batch_id)       # (id, status, sku, part_name, supplier)
+        # self.populate_item_table(rows)
+        pass
 
     def populate_item_table(self, rows):
         self.item_table.setRowCount(0)
