@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtCore import (
+    Qt,
     QDate, 
     QStringListModel, 
     QTimer 
@@ -37,12 +38,12 @@ from logic.transactions import (
 from logic.restock import (
     add_request_item, 
     get_part_id_by_sku, 
-    get_curr_date
+    get_request_items
 )
 
 from logic.restock_transitions import (
-    mark_item_procured,
-    mark_item_carried_over
+    mark_items_ordered,
+    mark_items_received
 )
 
 import traceback
