@@ -1,34 +1,35 @@
 import os
 import sqlite3
+from datetime import datetime
 
 DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
 
-def mark_batch_ordered(id, date):
-    with sqlite3.connect(DB) as conn:
-        cursor = conn.cursor()
-
-        batch_order_update = """
-        UPDATE restock_batches
-        SET status = 'ORDERED', ordered_on = ?
-        WHERE id = ? AND status = 'OPEN'
-        """
-
-        cursor.execute(batch_order_update, (date, id,))
-
-def mark_batch_completed():
-    pass
-
-def mark_item_procured(part_id):
-    with sqlite3.connect(DB) as conn:
-        cursor = conn.cursor()
-
-        item_procured_update = """
+def mark_items_ordered(item_ids):
+    if not item_ids:
+        return
+    placeholders = ",".join("?" for _ in item_ids)
+    query = f"""
         UPDATE request_items
-        SET status = 'PROCURED'
-        WHERE part_id = ? AND status = 'PENDING'
-        """
+        SET 
+            status = 'ORDERED', 
+            ordered_on = ?
+        WHERE id IN ({placeholders}) AND status = 'PENDING'
+    """
+    date = datetime.now().strftime("%Y-%m-%d")
+    with sqlite3.connect(DB) as conn:
+        conn.execute(query, (date, *item_ids))
 
-        cursor.execute(item_procured_update, (part_id,))
-
-def mark_item_carried_over():
-    pass
+def mark_items_received(item_ids):
+    if not item_ids:
+        return
+    placeholders = ",".join("?" for _ in item_ids)
+    query = f"""
+        UPDATE request_items
+        SET 
+            status = 'RECEIVED', 
+            received_on = ?
+        WHERE id IN ({placeholders}) AND status = 'ORDERED'
+    """
+    date = datetime.now().strftime("%Y-%m-%d")
+    with sqlite3.connect(DB) as conn:
+        conn.execute(query, (date, *item_ids))

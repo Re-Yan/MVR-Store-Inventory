@@ -6,7 +6,7 @@ DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
 
 def get_curr_date():
         date = datetime.now()
-        curr_formatted_date = date.strftime("%Y-%m-%d")
+        curr_formatted_date = date.strftime("%y-%m-%d")
         return curr_formatted_date
 
 def get_part_id_by_sku(sku):
