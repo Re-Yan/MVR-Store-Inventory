@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
     QSpinBox, 
     QDoubleSpinBox, 
     QListView, 
-    QPlainTextEdit
+    QPlainTextEdit,
+    QComboBox,
+    QAbstractItemView
 )
 
 from PySide6.QtCore import (
@@ -49,9 +51,9 @@ from logic.restock_transitions import (
 import traceback
 
 STATUS_COLORS = {
-    "PENDING":      QColor("#b58900"),
-    "PROCURED":     QColor("#2aa198"),
-    "CARRIED OVER": QColor("#888888"),
+    "PENDING":     QColor("#b58900"),
+    "ORDERED":     QColor("#2aa198"),
+    "RECEIVED":    QColor("#888888"),
 }
 
 # CLASSES
@@ -227,6 +229,7 @@ class restock_page(QWidget):
 
         main_layout.addWidget(self.left_panel, 1)
         main_layout.addWidget(self.right_panel, 2)
+        self.reload()
 
     def build_left_panel(self):
         panel = QWidget()
@@ -254,81 +257,58 @@ class restock_page(QWidget):
 
     def build_right_panel(self):
             panel = QWidget()
-            right_layout = QVBoxLayout()
-            self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Action"])
+            layout = QVBoxLayout(panel)
             
-            right_layout.addWidget(self.build_header_batch())
-            right_layout.addWidget(self.item_table)
-            panel.setLayout(right_layout)
+            control_bar = QHBoxLayout()
 
+            self.filter_combo = QComboBox()
+            self.filter_combo.addItems(["All", "PENDING", "ORDERED", "RECEIVED"])
+            self.filter_combo.currentTextChanged.connect(self.reload) # create self.refresh function
+            
+            self.order_button = QPushButton("Mark Ordered")
+            self.receive_button = QPushButton("Mark Received")
+
+            control_bar.addWidget(QLabel("Filter:"))
+            control_bar.addWidget(self.filter_combo)
+            control_bar.addStretch()
+            control_bar.addWidget(self.order_button)
+            control_bar.addWidget(self.receive_button)
+
+            self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier"])
+            self.item_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            self.item_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection) # question about selection methods
+
+            layout.addLayout(control_bar)
+            layout.addWidget(self.item_table)
             return panel
     
-    def build_header_batch(self):
-        header = QWidget()
-        header_layout = QVBoxLayout(header)
+    def reload(self, _text=None):
+            status = self.filter_combo.currentText()
+            if status == "All":
+                status = None
 
-        # ── meta line: which batch, created date, status ──
-        self.batch_label   = QLabel("Batch —")
-        self.batch_created = QLabel("created —")
-        self.batch_status  = QLabel("status: —")
-
-        meta_row = QHBoxLayout()
-        meta_row.addWidget(self.batch_label)
-        meta_row.addWidget(self.batch_created)
-        meta_row.addWidget(self.batch_status)
-        meta_row.addStretch()                       # keep labels left, soak up extra width
-
-        # ── batch-level actions (inert in step 1) ──
-        self.order_button    = QPushButton("Order Batch")
-        self.order_button.clicked.connect(self.handle_order_batch)
-        self.complete_button = QPushButton("Complete Batch")
-
-        button_row = QHBoxLayout()
-        button_row.addWidget(self.order_button)
-        button_row.addWidget(self.complete_button)
-        button_row.addStretch()
-
-        header_layout.addLayout(meta_row)
-        header_layout.addLayout(button_row)
-
-        return header
-
-    def handle_order_batch(self):
-        self.load_batch(self.current_batch_id)
-    
-    def refresh_item_table(self):
-        # rows = get_request_items_from_batch(self.current_batch_id)       # (id, status, sku, part_name, supplier)
-        # self.populate_item_table(rows)
-        pass
+            rows = get_request_items(status)
+            self.populate_item_table(rows)
 
     def populate_item_table(self, rows):
         self.item_table.setRowCount(0)
         self.item_table.setRowCount(len(rows))
-
         for r, row in enumerate(rows):
             item_id, status, sku, part_name, supplier = row[0], row[1], row[2], row[3], row[4]
             status_item = QTableWidgetItem(str(status))
             status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
+            status_item.setData(Qt.UserRole, item_id)        # id lives on the row for Step 5
             self.item_table.setItem(r, 0, status_item)
             self.item_table.setItem(r, 1, QTableWidgetItem(str(sku)))
             self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
-            if status == "PENDING":
-                receive_button = QPushButton("Receive")
-                receive_button.clicked.connect(
-                    lambda _checked, iid=item_id: self.handle_receive_item(iid)
-                )
-                self.item_table.setCellWidget(r, 4, receive_button)
 
     def handle_receive_item(self, item_id):
-        mark_item_procured(item_id)
-        self.load_batch(self.current_batch_id)
+        pass
 
     def add_item(self, item_id, supplier): 
-        batch_id = self.current_batch_id
         notes = self.notes_input.toPlainText().strip()
-
-        add_request_item(batch_id, item_id, supplier, "PENDING", notes)
+        add_request_item(item_id, supplier, notes)
 
     def handle_add_item(self):
         sku = self.sku_input.text().strip()            
@@ -353,19 +333,4 @@ class restock_page(QWidget):
             return
 
         self.add_item(item_id, supplier)
-        self.load_batch(self.current_batch_id)
-
-    def _sync_action_buttons(self, status):
-        self.order_button.setEnabled(status == "OPEN")
-        self.complete_button.setEnabled(status == "ORDERED")
-        self.add_button.setEnabled(status == "OPEN")
-
-    def load_batch(self, batch_id):
-        self.current_batch_id = batch_id
-        b_id, creation_date, status = get_batch(batch_id)
-        self.batch_label.setText(f"Batch # {b_id}")
-        self.batch_created.setText(f"Created {creation_date}")
-        self.batch_status.setText(f"Status {status}")
-        self._sync_action_buttons(status)
-        self.refresh_item_table()
-    
+        self.reload()
