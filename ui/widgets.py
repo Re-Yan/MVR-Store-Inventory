@@ -266,7 +266,9 @@ class restock_page(QWidget):
             self.filter_combo.currentTextChanged.connect(self.reload) # create self.refresh function
             
             self.order_button = QPushButton("Mark Ordered")
+            self.order_button.clicked.connect(self.handle_mark_ordered)
             self.receive_button = QPushButton("Mark Received")
+            self.receive_button.clicked.connect(self.handle_mark_received)
 
             control_bar.addWidget(QLabel("Filter:"))
             control_bar.addWidget(self.filter_combo)
@@ -277,6 +279,9 @@ class restock_page(QWidget):
             self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier"])
             self.item_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             self.item_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection) # question about selection methods
+            self.item_table.itemSelectionChanged.connect(self.sync_action_buttons)
+
+            self.sync_action_buttons() # Disables the wrong button on startup
 
             layout.addLayout(control_bar)
             layout.addWidget(self.item_table)
@@ -303,8 +308,15 @@ class restock_page(QWidget):
             self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
 
-    def handle_receive_item(self, item_id):
-        pass
+    def sync_action_buttons(self):
+        selected = self.item_table.selectionModel().selectedRows()
+        if not selected:
+            self.order_button.setEnabled(False)
+            self.receive_button.setEnabled(False)
+            return
+        statuses = {self.item_table.item(idx.row(), 0).text() for idx in selected}
+        self.order_button.setEnabled(statuses == {"PENDING"})
+        self.receive_button.setEnabled(statuses == {"ORDERED"})
 
     def add_item(self, item_id, supplier): 
         notes = self.notes_input.toPlainText().strip()
@@ -333,4 +345,25 @@ class restock_page(QWidget):
             return
 
         self.add_item(item_id, supplier)
+        self.reload()
+
+    def selected_item_ids(self):
+        ids = []
+        for index in self.item_table.selectionModel().selectedRows():
+            cell = self.item_table.item(index.row(), 0)   # col 0 holds the id
+            ids.append(cell.data(Qt.ItemDataRole.UserRole))
+        return ids
+
+    def handle_mark_ordered(self):
+        ids = self.selected_item_ids()
+        if not ids:
+            return
+        mark_items_ordered(ids)
+        self.reload()
+
+    def handle_mark_received(self):
+        ids = self.selected_item_ids()
+        if not ids:
+            return
+        mark_items_received(ids)
         self.reload()
