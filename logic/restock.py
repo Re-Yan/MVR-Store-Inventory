@@ -38,6 +38,7 @@ def get_request_items(statuses=None):
         if statuses:
             placeholders = ",".join("?" for _ in statuses)
             query += f" WHERE ri.status IN ({placeholders})"
+            query += " ORDER BY ri.created_on ASC, ri.id ASC"
             params = tuple(statuses)
 
         cursor.execute(query, params)

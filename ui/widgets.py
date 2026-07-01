@@ -366,6 +366,9 @@ class restock_page(QWidget):
         ids = self.selected_item_ids()
         if not ids:
             return
+        if QMessageBox.question(self, "Confirm", f"Mark {len(ids)} item(s) as ORDERED?") \
+                != QMessageBox.StandardButton.Yes:
+            return
         mark_items_ordered(ids)
         self.reload()
 
