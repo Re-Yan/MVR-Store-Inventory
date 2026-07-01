@@ -24,7 +24,7 @@ def get_part_id_by_sku(sku):
         part_id = cursor.fetchone()
         return part_id[0] if part_id else None
 
-def get_request_items(status=None):
+def get_request_items(statuses=None):
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
@@ -35,9 +35,10 @@ def get_request_items(status=None):
             INNER JOIN parts p ON ri.part_id = p.id
         """
         params = ()
-        if status is not None:
-            query += " WHERE ri.status = ?"
-            params = (status,)
+        if statuses:
+            placeholders = ",".join("?" for _ in statuses)
+            query += f" WHERE ri.status IN ({placeholders})"
+            params = tuple(statuses)
 
         cursor.execute(query, params)
         return cursor.fetchall()

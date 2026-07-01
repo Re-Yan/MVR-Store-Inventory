@@ -56,6 +56,14 @@ STATUS_COLORS = {
     "RECEIVED":    QColor("#888888"),
 }
 
+FILTER_MAP = {
+    "Active":   ["PENDING", "ORDERED"],
+    "All":      None,
+    "PENDING":  ["PENDING"],
+    "ORDERED":  ["ORDERED"],
+    "RECEIVED": ["RECEIVED"],
+}
+
 # CLASSES
 
 class LogSection(QWidget):
@@ -262,7 +270,7 @@ class restock_page(QWidget):
             control_bar = QHBoxLayout()
 
             self.filter_combo = QComboBox()
-            self.filter_combo.addItems(["All", "PENDING", "ORDERED", "RECEIVED"])
+            self.filter_combo.addItems(["Active", "All", "PENDING", "ORDERED", "RECEIVED"])
             self.filter_combo.currentTextChanged.connect(self.reload) # create self.refresh function
             
             self.order_button = QPushButton("Mark Ordered")
@@ -276,7 +284,7 @@ class restock_page(QWidget):
             control_bar.addWidget(self.order_button)
             control_bar.addWidget(self.receive_button)
 
-            self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier"])
+            self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Requested", "Ordered", "Received"])
             self.item_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             self.item_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection) # question about selection methods
             self.item_table.itemSelectionChanged.connect(self.sync_action_buttons)
@@ -288,18 +296,15 @@ class restock_page(QWidget):
             return panel
     
     def reload(self, _text=None):
-            status = self.filter_combo.currentText()
-            if status == "All":
-                status = None
-
-            rows = get_request_items(status)
+            statuses = FILTER_MAP[self.filter_combo.currentText()]
+            rows = get_request_items(statuses)
             self.populate_item_table(rows)
 
     def populate_item_table(self, rows):
         self.item_table.setRowCount(0)
         self.item_table.setRowCount(len(rows))
         for r, row in enumerate(rows):
-            item_id, status, sku, part_name, supplier = row[0], row[1], row[2], row[3], row[4]
+            item_id, status, sku, part_name, supplier, requested, ordered, received = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]
             status_item = QTableWidgetItem(str(status))
             status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
             status_item.setData(Qt.UserRole, item_id)        # id lives on the row for Step 5
@@ -307,6 +312,9 @@ class restock_page(QWidget):
             self.item_table.setItem(r, 1, QTableWidgetItem(str(sku)))
             self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
+            self.item_table.setItem(r, 4, QTableWidgetItem(str(requested or "")))
+            self.item_table.setItem(r, 5, QTableWidgetItem(str(ordered or "")))
+            self.item_table.setItem(r, 6, QTableWidgetItem(str(received or "")))
 
     def sync_action_buttons(self):
         selected = self.item_table.selectionModel().selectedRows()
