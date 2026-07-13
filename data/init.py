@@ -55,12 +55,14 @@ def initialize_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL, -- Date Format: YYYY-MM-DD
             quantity INTEGER NOT NULL,
-            part_id TEXT NOT NULL,
+            part_id INTEGER NOT NULL,
+            batch_id INTEGER,
             transaction_type TEXT NOT NULL, 
             cost_at_time INTEGER NOT NULL, 
             sale_at_time INTEGER NOT NULL,
             notes TEXT,
-            FOREIGN KEY (part_id) REFERENCES parts(id)
+            FOREIGN KEY (part_id) REFERENCES parts(id),
+            FOREIGN KEY (batch_id) REFERENCES stock_batches(id)
             )
         """)
 
