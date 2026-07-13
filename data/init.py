@@ -119,12 +119,21 @@ def create_restock_tables():
         cursor = conn.cursor()
 
         cursor.execute("PRAGMA foreign_keys = ON;")
-
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL COLLATE NOCASE
+                       )
+                        """)
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS request_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 part_id INTEGER NOT NULL,
-                supplier TEXT, 
+                supplier_id INTEGER NOT NULL,
+                quantity INTEGER,
+                unit_cost INTEGER,
                 urgency_score INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'PENDING'
                     CHECK(status IN ('PENDING', 'ORDERED', 'RECEIVED')),
@@ -132,10 +141,54 @@ def create_restock_tables():
                 ordered_on TEXT,
                 received_on TEXT,
                 notes TEXT,
+                       
+                FOREIGN KEY (part_id) REFERENCES parts(id),
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                       )
+                        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS stock_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part_id INTEGER NOT NULL,
+                supplier_id INTEGER,
+                request_item_id INTEGER,
+                qty_received INTEGER NOT NULL,
+                qty_remaining INTEGER NOT NULL,
+                unit_cost INTEGER NOT NULL,
+                received_on TEXT NOT NULL,
+                CHECK (qty_remaining >= 0 AND qty_remaining <= qty_received),
                 
-                FOREIGN KEY (part_id) REFERENCES parts(id)
-                )
-                    """)
+                FOREIGN KEY (part_id) REFERENCES parts(id),
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                FOREIGN KEY (request_item_id) REFERENCES request_items(id)
+                      )
+                        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_batches_fifo
+            ON stock_batches(part_id, received_on)
+                        """)
+    
+        conn.commit()
+
+def seed_opening_batches():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")    
+        cursor.execute("""
+            INSERT INTO stock_batches
+                (part_id, supplier_id, request_item_id, qty_received, qty_remaining, unit_cost, received_on)
+            SELECT p.id, NULL, NULL, p.current_stock, p.current_stock, p.base_cost_price, DATE('now', 'localtime')
+            FROM parts p
+            WHERE p.current_stock > 0
+                AND NOT EXISTS (
+                       SELECT 1 FROM stock_batches b 
+                       WHERE b.part_id = p.id
+                       )
+                        """)
+        conn.commit()
+
 
 def migrate_csv_to_sql():
     conn = sqlite3.connect(DB_PATH)
@@ -224,24 +277,6 @@ def migrate_csv_to_sql():
                     row_dict.get('current_stock'), shelf_id, stock_warning, is_active
                 ))
 
-    # 5. Migrate Transactions
-    trans_file = os.path.join(CSV_FOLDER, 'transactions.csv')
-    if os.path.exists(trans_file):
-        # Transactions CSV is treated as a full snapshot, so clear existing rows first.
-        cursor.execute("DELETE FROM transactions")
-        with open(trans_file, mode='r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                cursor.execute("""
-                    INSERT INTO transactions 
-                    (timestamp, quantity, part_id, transaction_type, cost_at_time, sale_at_time, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    row.get('timestamp'), row.get('quantity'), normalize_id(row.get('part_id')), 
-                    row.get('transaction_type'), row.get('cost_at_time'), 
-                    row.get('sale_at_time'), row.get('notes')
-                ))
-
     # 6. Migrate Aliases
     alias_file = os.path.join(CSV_FOLDER, 'Aliases.csv')
     if os.path.exists(alias_file):
@@ -275,6 +310,7 @@ def migrate_csv_to_sql():
 
 if __name__ == "__main__":
     initialize_database()
+    create_restock_tables()
     migrate_csv_to_sql()
     create_revenue_view()
-    create_restock_tables()
+    seed_opening_batches()
