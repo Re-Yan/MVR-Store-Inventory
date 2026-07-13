@@ -266,15 +266,25 @@ def migrate_csv_to_sql():
                 
                 is_active = row_dict.get('is_active')
                 is_active = int(is_active) if is_active and is_active.strip() else None
-                
+
+                def to_int(value):
+                    if value is None:
+                        return 0
+                    cleaned = value.replace(',', '').strip()
+                    return int(cleaned) if cleaned else 0
+
+                current_stock = to_int(row_dict.get('current_stock'))
+                base_cost_price = to_int(row_dict.get('base_cost_price'))
+                srp_price = to_int(row_dict.get('srp_price'))
+
                 cursor.execute("""
-                    INSERT OR IGNORE INTO parts 
+                    INSERT OR IGNORE INTO parts
                     (sku, part_name, base_cost_price, srp_price, current_stock, shelf_id, stock_warning, is_active)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    row_dict.get('sku'), row_dict.get('part_name'), 
-                    row_dict.get('base_cost_price'), row_dict.get('srp_price'), 
-                    row_dict.get('current_stock'), shelf_id, stock_warning, is_active
+                    row_dict.get('sku'), row_dict.get('part_name'),
+                    base_cost_price, srp_price,
+                    current_stock, shelf_id, stock_warning, is_active
                 ))
 
     # 6. Migrate Aliases
