@@ -6,70 +6,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "mvr_inventory.db")
 CSV_FOLDER = os.path.join(BASE_DIR, "data", "csv_files")
 
-def ensure_transactions_use_sku_fk(cursor):
-    cursor.execute("PRAGMA table_info(transactions)")
-    columns = cursor.fetchall()
-    if not columns:
-        return
-
-    part_id_column = next((col for col in columns if col[1] == 'part_id'), None)
-    part_id_type = (part_id_column[2] if part_id_column else "").upper()
-
-    cursor.execute("PRAGMA foreign_key_list(transactions)")
-    fks = cursor.fetchall()
-    has_sku_fk = any(
-        fk[2] == 'parts' and fk[3] == 'part_id' and fk[4] == 'sku'
-        for fk in fks
-    )
-
-    if part_id_type == 'TEXT' and has_sku_fk:
-        return
-
-    cursor.execute("PRAGMA foreign_keys = OFF")
-    cursor.execute("DROP VIEW IF EXISTS v_transactions_with_revenue")
-
-    cursor.execute("""
-        CREATE TABLE transactions_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            part_id TEXT NOT NULL,
-            transaction_type TEXT NOT NULL,
-            cost_at_time INTEGER NOT NULL,
-            sale_at_time INTEGER NOT NULL,
-            notes TEXT,
-            FOREIGN KEY (part_id) REFERENCES parts(sku)
-            )
-        """)
-
-    cursor.execute("""
-        INSERT INTO transactions_new
-        (id, timestamp, quantity, part_id, transaction_type, cost_at_time, sale_at_time, notes)
-        SELECT
-            t.id,
-            t.timestamp,
-            t.quantity,
-            COALESCE(
-                (
-                    SELECT p.sku
-                    FROM parts p
-                    WHERE p.sku = CAST(t.part_id AS TEXT)
-                       OR ltrim(p.sku, '0') = ltrim(CAST(t.part_id AS TEXT), '0')
-                    LIMIT 1
-                ),
-                CAST(t.part_id AS TEXT)
-            ),
-            t.transaction_type,
-            t.cost_at_time,
-            t.sale_at_time,
-            t.notes
-        FROM transactions t
-        """)
-
-    cursor.execute("DROP TABLE transactions")
-    cursor.execute("ALTER TABLE transactions_new RENAME TO transactions")
-    cursor.execute("PRAGMA foreign_keys = ON")
-
 
 def initialize_database():
     conn = sqlite3.connect(DB_PATH)
@@ -146,8 +82,6 @@ def initialize_database():
         CREATE INDEX IF NOT EXISTS idx_aliases_part_id
         ON aliases(part_id)
     """)
-
-    ensure_transactions_use_sku_fk(cursor)
 
     conn.commit()
     return conn
