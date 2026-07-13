@@ -9,6 +9,12 @@ def get_curr_date():
         curr_formatted_date = date.strftime("%y-%m-%d")
         return curr_formatted_date
 
+def get_suppliers():
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name FROM suppliers ORDER BY name")
+        return cursor.fetchall()
+
 def get_part_id_by_sku(sku):
     # TODO: add error handling for this function: wrap in try/except block
     with sqlite3.connect(DB) as conn:
