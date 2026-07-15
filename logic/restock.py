@@ -6,7 +6,7 @@ DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
 
 def get_curr_date():
         date = datetime.now()
-        curr_formatted_date = date.strftime("%y-%m-%d")
+        curr_formatted_date = date.strftime("%Y-%m-%d")
         return curr_formatted_date
 
 def get_suppliers():
@@ -46,17 +46,18 @@ def get_request_items(statuses=None):
         cursor = conn.cursor()
 
         query = """
-            SELECT ri.id, ri.status, p.sku, p.part_name,
-                ri.supplier, ri.created_on, ri.ordered_on, ri.received_on
+            SELECT ri.id, ri.status, p.sku, p.part_name, s.name, 
+            ri.quantity, ri.unit_cost, ri.created_on, ri.ordered_on, ri.received_on
             FROM request_items ri
             INNER JOIN parts p ON ri.part_id = p.id
+            INNER JOIN suppliers s ON ri.supplier_id = s.id
         """
         params = ()
         if statuses:
             placeholders = ",".join("?" for _ in statuses)
             query += f" WHERE ri.status IN ({placeholders})"
-            query += " ORDER BY ri.created_on ASC, ri.id ASC"
             params = tuple(statuses)
+        query += " ORDER BY ri.created_on ASC, ri.id ASC"
 
         cursor.execute(query, params)
         return cursor.fetchall()
@@ -68,7 +69,7 @@ def add_request_item(part_id, supplier, notes):
         curr_date = get_curr_date()
 
         insert_request_item = """
-            INSERT INTO request_items (part_id, supplier, urgency_score, status, created_on, ordered_on, received_on, notes)
+            INSERT INTO request_items (part_id, supplier_id, urgency_score, status, created_on, ordered_on, received_on, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         try:
