@@ -15,6 +15,17 @@ def get_suppliers():
         cursor.execute("SELECT id, name FROM suppliers ORDER BY name")
         return cursor.fetchall()
 
+def get_or_create_supplier(name):
+    if not name or not name.strip():
+        raise ValueError("Supplier name cannot be empty")
+    name = name.strip()
+
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR IGNORE INTO suppliers (name) VALUES (?)", (name,))
+        cursor.execute("SELECT id FROM suppliers WHERE name = ?", (name,))
+        return cursor.fetchone()[0]
+
 def get_part_id_by_sku(sku):
     # TODO: add error handling for this function: wrap in try/except block
     with sqlite3.connect(DB) as conn:
