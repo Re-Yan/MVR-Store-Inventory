@@ -290,7 +290,7 @@ class restock_page(QWidget):
             control_bar.addWidget(self.order_button)
             control_bar.addWidget(self.receive_button)
 
-            self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Requested", "Ordered", "Received"])
+            self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Qty", "Unit Cost", "Requested", "Ordered", "Received"])
             self.item_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             self.item_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection) # question about selection methods
             self.item_table.itemSelectionChanged.connect(self.sync_action_buttons)
@@ -309,8 +309,9 @@ class restock_page(QWidget):
     def populate_item_table(self, rows):
         self.item_table.setRowCount(0)
         self.item_table.setRowCount(len(rows))
+        
         for r, row in enumerate(rows):
-            item_id, status, sku, part_name, supplier, requested, ordered, received = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]
+            item_id, status, sku, part_name, supplier, quantity, unit_cost, requested, ordered, received = row
             status_item = QTableWidgetItem(str(status))
             status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
             status_item.setData(Qt.UserRole, item_id)        # id lives on the row for Step 5
@@ -318,6 +319,8 @@ class restock_page(QWidget):
             self.item_table.setItem(r, 1, QTableWidgetItem(str(sku)))
             self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
+            self.item_table.setItem(r, 3, QTableWidgetItem(str(quantity if quantity is not None else "")))
+            self.item_table.setItem(r, 3, QTableWidgetItem(f"₱{unit_cost}" if  unit_cost is not None else ""))
             self.item_table.setItem(r, 4, QTableWidgetItem(str(requested or "")))
             self.item_table.setItem(r, 5, QTableWidgetItem(str(ordered or "")))
             self.item_table.setItem(r, 6, QTableWidgetItem(str(received or "")))
