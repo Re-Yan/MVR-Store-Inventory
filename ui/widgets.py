@@ -15,7 +15,9 @@ from PySide6.QtWidgets import (
     QListView, 
     QPlainTextEdit,
     QComboBox,
-    QAbstractItemView
+    QAbstractItemView,
+    QDialog,
+    QDialogButtonBox
 )
 
 from PySide6.QtCore import (
@@ -40,7 +42,9 @@ from logic.transactions import (
 from logic.restock import (
     add_request_item, 
     get_part_id_by_sku, 
-    get_request_items
+    get_request_items,
+    get_suppliers,
+    get_or_create_supplier
 )
 
 from logic.restock_transitions import (
