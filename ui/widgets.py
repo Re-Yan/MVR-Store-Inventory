@@ -230,6 +230,40 @@ class transaction_page(QWidget):
         print(results)
         self.populate_table(results)
 
+class OrderDetailsDialog(QDialog):
+    """Collects quantity and unit cost for each request item being ordered."""
+    def __init__(self, items, parent=None):
+        # items: list of (item_id, part_name)
+        super().__init__(parent)
+        self.setWindowTitle("Order Details")
+        layout = QFormLayout(self)
+        self.inputs = {}   # item_id -> (qty_spin, cost_spin)
+
+        for item_id, part_name in items:
+            qty_spin = QSpinBox()
+            qty_spin.setRange(1, 100000)
+            cost_spin = QSpinBox()
+            cost_spin.setRange(1, 1000000)
+            cost_spin.setPrefix("₱")
+            layout.addRow(QLabel(part_name))
+            layout.addRow("Quantity:", qty_spin)
+            layout.addRow("Unit Cost:", cost_spin)
+            self.inputs[item_id] = (qty_spin, cost_spin)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+
+    def get_order_data(self):
+        return [
+            (item_id, qty.value(), cost.value())
+            for item_id, (qty, cost) in self.inputs.items()
+        ]
+    
+
 class restock_page(QWidget):
     def __init__(self):
         super().__init__()
@@ -375,20 +409,43 @@ class restock_page(QWidget):
         return ids
 
     def handle_mark_ordered(self):
-        ids = self.selected_item_ids()
-        if not ids:
+        selected = self.item_table.selectionModel().selectedRows()
+        if not selected:
             return
-        if QMessageBox.question(self, "Confirm", f"Mark {len(ids)} item(s) as ORDERED?") \
-                != QMessageBox.StandardButton.Yes:
+        items = [
+            (self.item_table.item(idx.row(), 0).data(Qt.ItemDataRole.UserRole),
+            self.item_table.item(idx.row(), 2).text())
+            for idx in selected
+        ]
+        dialog = OrderDetailsDialog(items, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        mark_items_ordered(ids)
+        try:
+            mark_items_ordered(dialog.get_order_data())
+        except ValueError as e:
+            QMessageBox.warning(self, "Invalid Order", str(e))
+            return
         self.reload()
 
     def handle_mark_received(self):
-        ids = self.selected_item_ids()
-        if not ids:
+        selected = self.item_table.selectionModel().selectedRows()
+        if not selected:
             return
-        mark_items_received(ids)
+        lines = [
+            f"{self.item_table.item(idx.row(), 2).text()}: "
+            f"{self.item_table.item(idx.row(), 4).text()} @ {self.item_table.item(idx.row(), 5).text()}"
+            for idx in selected
+        ]
+        if QMessageBox.question(
+            self, "Confirm Receipt",
+            "Add to inventory?\n\n" + "\n".join(lines)
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            mark_items_received(self.selected_item_ids())
+        except ValueError as e:
+            QMessageBox.warning(self, "Cannot Receive", str(e))
+            return
         self.reload()
 
     def load_supppliers(self):
