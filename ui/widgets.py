@@ -251,8 +251,10 @@ class restock_page(QWidget):
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
 
-        self.supplier_input = QLineEdit()
-        self.supplier_input.setPlaceholderText("Enter Supplier Name")
+        self.supplier_input = QComboBox()
+        self.supplier_input.setEditable(True)
+        self.supplier_input.setPlaceholderText("Select or Type Supplier")
+        self.load_suppliers()
         self.notes_input = QPlainTextEdit()
         self.notes_input.setPlaceholderText("Enter Notes (Optional)")
         self.add_button = QPushButton("Add +")
@@ -382,3 +384,9 @@ class restock_page(QWidget):
             return
         mark_items_received(ids)
         self.reload()
+
+    def load_supppliers(self):
+        current = self.supplier_input.currentText()
+        self.supplier_input.clear()
+        self.supplier_input.addItem([name for _id, name in get_suppliers()])
+        self.supplier_input.setCurrentText(current)
