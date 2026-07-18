@@ -24,14 +24,36 @@ def mark_items_ordered(items):
 def mark_items_received(item_ids):
     if not item_ids:
         return
-    placeholders = ",".join("?" for _ in item_ids)
-    query = f"""
-        UPDATE request_items
-        SET 
-            status = 'RECEIVED', 
-            received_on = ?
-        WHERE id IN ({placeholders}) AND status = 'ORDERED'
-    """
     date = datetime.now().strftime("%Y-%m-%d")
+    placeholders = ",".join("?" for _ in item_ids)
+
     with sqlite3.connect(DB) as conn:
-        conn.execute(query, (date, *item_ids))
+        conn.execute("PRAGMA foreign_keys = ON")
+        cursor = conn.cursor()
+
+        cursor.execute(f"""
+            SELECT id, part_id, supplier_id, quantity, unit_cost
+            FROM request_items
+            WHERE id IN ({placeholders}) AND status = 'ORDERED'
+        """, item_ids)
+        rows = cursor.fetchall()
+
+        for item_id, part_id, supplier_id, quantity, unit_cost in rows:
+            if quantity is None or unit_cost is None:
+                raise ValueError(f"Request item {item_id} has no quantity/cost recorded")
+
+            cursor.execute("""
+                INSERT INTO stock_batches
+                    (part_id, supplier_id, request_item_id, qty_received, qty_remaining, unit_cost, received_on)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (part_id, supplier_id, item_id, quantity, quantity, unit_cost, date))
+
+            cursor.execute("""
+                UPDATE parts SET current_stock = current_stock + ?
+                WHERE id = ?
+            """, (quantity, part_id))
+
+            cursor.execute("""
+                UPDATE request_items SET status = 'RECEIVED', received_on = ?
+                WHERE id = ?
+            """, (date, item_id))

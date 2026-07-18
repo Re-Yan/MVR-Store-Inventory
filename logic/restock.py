@@ -62,7 +62,7 @@ def get_request_items(statuses=None):
         cursor.execute(query, params)
         return cursor.fetchall()
 
-def add_request_item(part_id, supplier, notes):
+def add_request_item(part_id, supplier_id, notes):
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
@@ -75,7 +75,7 @@ def add_request_item(part_id, supplier, notes):
         try:
             cursor.execute(insert_request_item, (
                 part_id,
-                supplier,
+                supplier_id,
                 1,
                 'PENDING',
                 curr_date,
