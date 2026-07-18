@@ -351,15 +351,18 @@ class restock_page(QWidget):
             QMessageBox.warning(self, "UNKNOWN SKU", "NON-EXISTENT ITEM CODE")
             return
         
-        supplier = self.supplier_input.text().strip()
+        supplier_name = self.supplier_input.currentText().strip()
 
         # Error Handling for null supplier
-        if not supplier:
+        if not supplier_name:
             QMessageBox.warning(self, "Missing Input", "Please Provide Supplier Name")
             return
 
-        self.add_item(item_id, supplier)
+        supplier_id = get_or_create_supplier(supplier_name)
+        self.add_item(item_id, supplier_id)
+        self.load_supppliers()
         self.reload()
+
 
     def selected_item_ids(self):
         ids = []
