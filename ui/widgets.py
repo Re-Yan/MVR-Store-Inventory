@@ -52,6 +52,7 @@ from logic.restock_transitions import (
     mark_items_received
 )
 
+import sqlite3
 import traceback
 
 STATUS_COLORS = {
@@ -86,7 +87,7 @@ class LogSection(QWidget):
         form_layout.addRow(section_label)
         form_layout.addRow("SKU:", self.sku_input)
         form_layout.addRow("Quantity:", self.qty_input)
-        form_layout.addRow("Price:", self.price_input)
+        form_layout.addRow("Total Price:", self.price_input)
 
         # Quantity Widget
         self.qty_input.setRange(0, 100)
@@ -109,13 +110,29 @@ class LogSection(QWidget):
         self.setLayout(form_layout)
 
     def handle_submit(self):
-        sku = self.sku_input.text()
+        sku = self.sku_input.text().strip()
+        
+        if not sku:
+            QMessageBox.warning(self, "Missing Input", "Please Enter SKU")
+            return
         quantity = self.qty_input.value()
         price = self.price_input.value()
-        date = datetime.now()
-        formatted_date = date.strftime("%Y-%m-%d")
+        date = datetime.now().strftime("%Y-%m-%d")
 
-        insert_transaction(formatted_date, quantity, sku, price)
+        try:
+            splits = insert_transaction(date, quantity, sku, price)
+        except ValueError as e:
+            QMessageBox.warning(self, "Sale Blocked", str(e))
+            return
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
+            return
+
+        detail = ", ".join(f"{qty} @ ₱{cost}" for qty, cost in splits)
+        QMessageBox.information(self, "Sale Recorded", f"Sold {quantity} × {sku}\nCost basis: {detail}")
+        self.sku_input.clear()
+        self.qty_input.setValue(1)
+        self.price_input.setValue(0)
 
 class SearchSection(QWidget):
     def __init__(self, lineText, buttonText, label, on_selection=None):
@@ -353,11 +370,11 @@ class restock_page(QWidget):
             self.item_table.setItem(r, 1, QTableWidgetItem(str(sku)))
             self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
-            self.item_table.setItem(r, 3, QTableWidgetItem(str(quantity if quantity is not None else "")))
-            self.item_table.setItem(r, 3, QTableWidgetItem(f"₱{unit_cost}" if  unit_cost is not None else ""))
-            self.item_table.setItem(r, 4, QTableWidgetItem(str(requested or "")))
-            self.item_table.setItem(r, 5, QTableWidgetItem(str(ordered or "")))
-            self.item_table.setItem(r, 6, QTableWidgetItem(str(received or "")))
+            self.item_table.setItem(r, 4, QTableWidgetItem(str(quantity if quantity is not None else "")))
+            self.item_table.setItem(r, 5, QTableWidgetItem(f"₱{unit_cost}" if  unit_cost is not None else ""))
+            self.item_table.setItem(r, 6, QTableWidgetItem(str(requested or "")))
+            self.item_table.setItem(r, 7, QTableWidgetItem(str(ordered or "")))
+            self.item_table.setItem(r, 8, QTableWidgetItem(str(received or "")))
 
     def sync_action_buttons(self):
         selected = self.item_table.selectionModel().selectedRows()
@@ -397,7 +414,7 @@ class restock_page(QWidget):
 
         supplier_id = get_or_create_supplier(supplier_name)
         self.add_item(item_id, supplier_id)
-        self.load_supppliers()
+        self.load_suppliers()
         self.reload()
 
 
@@ -448,8 +465,8 @@ class restock_page(QWidget):
             return
         self.reload()
 
-    def load_supppliers(self):
+    def load_suppliers(self):
         current = self.supplier_input.currentText()
         self.supplier_input.clear()
-        self.supplier_input.addItem([name for _id, name in get_suppliers()])
+        self.supplier_input.addItems([name for _id, name in get_suppliers()])
         self.supplier_input.setCurrentText(current)
