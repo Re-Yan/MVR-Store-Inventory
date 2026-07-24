@@ -248,13 +248,21 @@ class transaction_page(QWidget):
         self.populate_table(results)
 
 class OrderDetailsDialog(QDialog):
-    """Collects quantity and unit cost for each request item being ordered."""
+    """Collects the supplier for the order plus quantity and unit cost per item."""
     def __init__(self, items, parent=None):
         # items: list of (item_id, part_name)
         super().__init__(parent)
         self.setWindowTitle("Order Details")
         layout = QFormLayout(self)
         self.inputs = {}   # item_id -> (qty_spin, cost_spin)
+
+        # One supplier applies to the whole order.
+        self.supplier_input = QComboBox()
+        self.supplier_input.setEditable(True)
+        self.supplier_input.setPlaceholderText("Select or Type Supplier")
+        self.supplier_input.addItems([name for _id, name in get_suppliers()])
+        self.supplier_input.setCurrentText("")
+        layout.addRow("Supplier:", self.supplier_input)
 
         for item_id, part_name in items:
             qty_spin = QSpinBox()
@@ -273,6 +281,9 @@ class OrderDetailsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addRow(buttons)
+
+    def get_supplier_name(self):
+        return self.supplier_input.currentText().strip()
 
     def get_order_data(self):
         return [
@@ -302,10 +313,6 @@ class restock_page(QWidget):
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
 
-        self.supplier_input = QComboBox()
-        self.supplier_input.setEditable(True)
-        self.supplier_input.setPlaceholderText("Select or Type Supplier")
-        self.load_suppliers()
         self.notes_input = QPlainTextEdit()
         self.notes_input.setPlaceholderText("Enter Notes (Optional)")
         self.add_button = QPushButton("Add +")
@@ -313,7 +320,6 @@ class restock_page(QWidget):
 
         left_layout.addRow(left_label)
         left_layout.addRow("SKU", self.sku_input)
-        left_layout.addRow("Supplier", self.supplier_input)
         left_layout.addRow("Notes", self.notes_input)
         left_layout.addRow(self.add_button)
 
@@ -386,9 +392,9 @@ class restock_page(QWidget):
         self.order_button.setEnabled(statuses == {"PENDING"})
         self.receive_button.setEnabled(statuses == {"ORDERED"})
 
-    def add_item(self, item_id, supplier): 
+    def add_item(self, item_id):
         notes = self.notes_input.toPlainText().strip()
-        add_request_item(item_id, supplier, notes)
+        add_request_item(item_id, notes)
 
     def handle_add_item(self):
         sku = self.sku_input.text().strip()            
@@ -405,16 +411,7 @@ class restock_page(QWidget):
             QMessageBox.warning(self, "UNKNOWN SKU", "NON-EXISTENT ITEM CODE")
             return
         
-        supplier_name = self.supplier_input.currentText().strip()
-
-        # Error Handling for null supplier
-        if not supplier_name:
-            QMessageBox.warning(self, "Missing Input", "Please Provide Supplier Name")
-            return
-
-        supplier_id = get_or_create_supplier(supplier_name)
-        self.add_item(item_id, supplier_id)
-        self.load_suppliers()
+        self.add_item(item_id)
         self.reload()
 
 
@@ -437,8 +434,15 @@ class restock_page(QWidget):
         dialog = OrderDetailsDialog(items, self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
+
+        supplier_name = dialog.get_supplier_name()
+        if not supplier_name:
+            QMessageBox.warning(self, "Missing Input", "Please Provide Supplier Name")
+            return
+        supplier_id = get_or_create_supplier(supplier_name)
+
         try:
-            mark_items_ordered(dialog.get_order_data())
+            mark_items_ordered(dialog.get_order_data(), supplier_id)
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Order", str(e))
             return
@@ -464,9 +468,3 @@ class restock_page(QWidget):
             QMessageBox.warning(self, "Cannot Receive", str(e))
             return
         self.reload()
-
-    def load_suppliers(self):
-        current = self.supplier_input.currentText()
-        self.supplier_input.clear()
-        self.supplier_input.addItems([name for _id, name in get_suppliers()])
-        self.supplier_input.setCurrentText(current)
