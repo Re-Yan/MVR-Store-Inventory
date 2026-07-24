@@ -131,7 +131,7 @@ def create_restock_tables():
             CREATE TABLE IF NOT EXISTS request_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 part_id INTEGER NOT NULL,
-                supplier_id INTEGER NOT NULL,
+                supplier_id INTEGER, 
                 quantity INTEGER,
                 unit_cost INTEGER,
                 urgency_score INTEGER NOT NULL DEFAULT 0,
