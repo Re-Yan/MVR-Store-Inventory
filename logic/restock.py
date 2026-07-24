@@ -50,7 +50,7 @@ def get_request_items(statuses=None):
             ri.quantity, ri.unit_cost, ri.created_on, ri.ordered_on, ri.received_on
             FROM request_items ri
             INNER JOIN parts p ON ri.part_id = p.id
-            INNER JOIN suppliers s ON ri.supplier_id = s.id
+            LEFT JOIN suppliers s ON ri.supplier_id = s.id
         """
         params = ()
         if statuses:
@@ -62,7 +62,7 @@ def get_request_items(statuses=None):
         cursor.execute(query, params)
         return cursor.fetchall()
 
-def add_request_item(part_id, supplier_id, notes):
+def add_request_item(part_id, notes):
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
 
@@ -75,7 +75,7 @@ def add_request_item(part_id, supplier_id, notes):
         try:
             cursor.execute(insert_request_item, (
                 part_id,
-                supplier_id,
+                None,
                 1,
                 'PENDING',
                 curr_date,
