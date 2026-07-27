@@ -54,7 +54,8 @@ from logic.restock import (
 
 from logic.restock_transitions import (
     mark_items_ordered,
-    mark_items_received
+    mark_items_received,
+    revert_items_to_pending
 )
 
 import sqlite3
@@ -433,6 +434,8 @@ class restock_page(QWidget):
             self.order_button.clicked.connect(self.handle_mark_ordered)
             self.receive_button = QPushButton("Mark Received")
             self.receive_button.clicked.connect(self.handle_mark_received)
+            self.revert_button = QPushButton("Revert to Pending")
+            self.revert_button.clicked.connect(self.handle_revert)
             self.delete_button = QPushButton("Delete")
             self.delete_button.clicked.connect(self.handle_delete)
 
@@ -445,6 +448,7 @@ class restock_page(QWidget):
             control_bar.addStretch()
             control_bar.addWidget(self.order_button)
             control_bar.addWidget(self.receive_button)
+            control_bar.addWidget(self.revert_button)
             control_bar.addWidget(self.delete_button)
 
             self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Qty", "Unit Cost", "Requested", "Ordered", "Received"])
@@ -487,11 +491,13 @@ class restock_page(QWidget):
         if not selected:
             self.order_button.setEnabled(False)
             self.receive_button.setEnabled(False)
+            self.revert_button.setEnabled(False)
             self.delete_button.setEnabled(False)
             return
         statuses = {self.item_table.item(idx.row(), 0).text() for idx in selected}
         self.order_button.setEnabled(statuses == {"PENDING"})
         self.receive_button.setEnabled(statuses == {"ORDERED"})
+        self.revert_button.setEnabled(statuses == {"ORDERED"})
         self.delete_button.setEnabled(statuses == {"PENDING"})
 
     def add_item(self, item_id):
@@ -568,6 +574,20 @@ class restock_page(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "Cannot Receive", str(e))
             return
+        self.reload()
+
+    def handle_revert(self):
+        selected = self.item_table.selectionModel().selectedRows()
+        if not selected:
+            return
+        lines = [self.item_table.item(idx.row(), 2).text() for idx in selected]
+        if QMessageBox.question(
+            self, "Confirm Revert",
+            "Revert these items to PENDING? Supplier, quantity and unit_cost "
+            "will be cleared: \n\n" + "\n".join(lines)
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        revert_items_to_pending(self.selected_item_ids())
         self.reload()
 
     def handle_delete(self):
