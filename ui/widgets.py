@@ -30,7 +30,9 @@ from PySide6.QtCore import (
 
 from PySide6.QtGui import (
     QColor,
-    QBrush
+    QBrush,
+    QShortcut,
+    QKeySequence
 )
 
 from datetime import datetime
@@ -406,9 +408,14 @@ class restock_page(QWidget):
 
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Enter Item Code")
+        self.sku_input.returnPressed.connect(self.handle_add_item)
 
         self.notes_input = QPlainTextEdit()
         self.notes_input.setPlaceholderText("Enter Notes (Optional)")
+        notes_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self.notes_input)
+        notes_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        notes_shortcut.activated.connect(self.handle_add_item)
+
         self.add_button = QPushButton("Add +")
         self.add_button.clicked.connect(self.handle_add_item)
 
@@ -520,6 +527,9 @@ class restock_page(QWidget):
             return
         
         self.add_item(item_id)
+        self.sku_input.clear()
+        self.sku_input.setFocus() # sets the focus back to SKU input for rapid entries
+        self.notes_input.clear()
         self.reload()
 
     def selected_item_ids(self):
