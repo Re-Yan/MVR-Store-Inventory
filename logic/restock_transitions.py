@@ -1,8 +1,5 @@
-import os
-import sqlite3
 from datetime import datetime
-
-DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
+from logic.db_connection import get_connection
 
 def mark_items_ordered(items, supplier_id):
     if not items:
@@ -16,7 +13,7 @@ def mark_items_ordered(items, supplier_id):
             raise ValueError(f"Item {item_id}: unit cost must be greater than 0")
     
     date = datetime.now().strftime("%Y-%m-%d")
-    with sqlite3.connect(DB) as conn:
+    with get_connection() as conn:
         conn.executemany("""
             UPDATE request_items
             SET supplier_id = ?, status = 'ORDERED', ordered_on = ?, quantity = ?, unit_cost = ?
@@ -29,8 +26,7 @@ def mark_items_received(item_ids):
     date = datetime.now().strftime("%Y-%m-%d")
     placeholders = ",".join("?" for _ in item_ids)
 
-    with sqlite3.connect(DB) as conn:
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         cursor.execute(f"""

@@ -1,7 +1,5 @@
 import sqlite3
-import os
-
-DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
+from logic.db_connection import get_connection
 
 def search_suggestions(search_term):
     """
@@ -14,7 +12,7 @@ def search_suggestions(search_term):
     
     search_term = search_term.strip()
     try:
-        with sqlite3.connect(DB) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             # Query 1: Exact or prefix match on SKU (highest priority)
@@ -80,7 +78,7 @@ def query_transaction_date(date_string, parent=None):
         """
 
     try:
-        with sqlite3.connect(DB) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (f"{date_string}%",))
             results = cursor.fetchall()
@@ -99,8 +97,7 @@ def insert_transaction(date, quantity, sku, total_price):
     if total_price < 0:
         raise ValueError("Price cannot be negative")
 
-    with sqlite3.connect(DB) as conn:
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # 1. Resolve part
@@ -171,7 +168,7 @@ def insert_transaction(date, quantity, sku, total_price):
     return [(take, unit_cost) for _, take, unit_cost, _ in rows_to_insert]
 
 def check_stock_consistency():
-    with sqlite3.connect(DB) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT p.sku, p.current_stock, COALESCE(SUM(b.qty_remaining), 0) AS batch_total

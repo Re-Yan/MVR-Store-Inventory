@@ -1,8 +1,6 @@
 import sqlite3
-import os
 from datetime import datetime
-
-DB = os.path.join(os.path.dirname(__file__), "..", "mvr_inventory.db")
+from logic.db_connection import get_connection
 
 def get_curr_date():
         date = datetime.now()
@@ -10,7 +8,7 @@ def get_curr_date():
         return curr_formatted_date
 
 def get_suppliers():
-    with sqlite3.connect(DB) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, name FROM suppliers ORDER BY name")
         return cursor.fetchall()
@@ -20,7 +18,7 @@ def get_or_create_supplier(name):
         raise ValueError("Supplier name cannot be empty")
     name = name.strip()
 
-    with sqlite3.connect(DB) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("INSERT OR IGNORE INTO suppliers (name) VALUES (?)", (name,))
         cursor.execute("SELECT id FROM suppliers WHERE name = ?", (name,))
@@ -28,7 +26,7 @@ def get_or_create_supplier(name):
 
 def get_part_id_by_sku(sku):
     # TODO: add error handling for this function: wrap in try/except block
-    with sqlite3.connect(DB) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         query = """
@@ -42,7 +40,7 @@ def get_part_id_by_sku(sku):
         return part_id[0] if part_id else None
 
 def get_request_items(statuses=None):
-    with sqlite3.connect(DB) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         query = """
@@ -63,7 +61,7 @@ def get_request_items(statuses=None):
         return cursor.fetchall()
 
 def add_request_item(part_id, notes):
-    with sqlite3.connect(DB) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         curr_date = get_curr_date()
