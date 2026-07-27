@@ -85,3 +85,47 @@ def add_request_item(part_id, notes):
         except sqlite3.Error as e:
             raise RuntimeError(f"Cannot Insert into DB: {e}") from e           
 
+def delete_request_items(item_ids):
+    if not item_ids:
+        return 0
+    placeholders = ",".join("?" for _ in item_ids)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            DELETE FROM request_items
+            WHERE id IN ({placeholders}) AND status = 'PENDING'
+        """, item_ids)
+        return cursor.rowcount
+
+def get_suppliers_with_counts():
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT s.id, s.name,
+                (SELECT COUNT(*) FROM request_items ri WHERE ri.supplier_id = s.id) AS order_refs,
+                (SELECT COUNT(*) FROM stock_batches b WHERE b.supplier_id = s.id) AS batch_refs
+            FROM suppliers s
+            ORDER BY s.name
+        """)
+        return cursor.fetchall()
+
+def rename_supplier(supplier_id, new_name):
+    if not new_name or not new_name.strip():
+        raise ValueError("Supplier name cannot be empty")
+    with get_connection() as conn:
+        try:
+            conn.execute("UPDATE suppliers SET name = ? WHERE id = ?",
+                         (new_name.strip(), supplier_id))
+        except sqlite3.IntegrityError:
+            raise ValueError(f"A supplier named '{new_name.strip()}' already exists")
+
+def delete_supplier(supplier_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT (SELECT COUNT(*) FROM request_items WHERE supplier_id = ?)
+                 + (SELECT COUNT(*) FROM stock_batches WHERE supplier_id = ?)
+        """, (supplier_id, supplier_id))
+        if cursor.fetchone()[0]:
+            raise ValueError("Cannot delete: supplier is referenced by orders or stock batches")
+        conn.execute("DELETE FROM suppliers WHERE id = ?", (supplier_id,))

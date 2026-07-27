@@ -17,7 +17,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QAbstractItemView,
     QDialog,
-    QDialogButtonBox
+    QDialogButtonBox,
+    QInputDialog
 )
 
 from PySide6.QtCore import (
@@ -44,7 +45,11 @@ from logic.restock import (
     get_part_id_by_sku, 
     get_request_items,
     get_suppliers,
-    get_or_create_supplier
+    get_or_create_supplier,
+    delete_request_items,
+    get_suppliers_with_counts,
+    rename_supplier,
+    delete_supplier
 )
 
 from logic.restock_transitions import (
@@ -290,7 +295,95 @@ class OrderDetailsDialog(QDialog):
             (item_id, qty.value(), cost.value())
             for item_id, (qty, cost) in self.inputs.items()
         ]
-    
+
+
+class SupplierManagerDialog(QDialog):
+    """Lists suppliers with usage counts; allows rename, and delete when unused."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Manage Suppliers")
+        layout = QVBoxLayout(self)
+
+        self.table = SectionTable(["Supplier", "Used By"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.itemSelectionChanged.connect(self.sync_buttons)
+
+        button_bar = QHBoxLayout()
+        self.rename_button = QPushButton("Rename")
+        self.rename_button.clicked.connect(self.handle_rename)
+        self.delete_button = QPushButton("Delete")
+        self.delete_button.clicked.connect(self.handle_delete)
+        button_bar.addStretch()
+        button_bar.addWidget(self.rename_button)
+        button_bar.addWidget(self.delete_button)
+
+        layout.addWidget(self.table)
+        layout.addLayout(button_bar)
+        self.reload()
+
+    def reload(self):
+        rows = get_suppliers_with_counts()
+        self.table.setRowCount(0)
+        self.table.setRowCount(len(rows))
+        for r, (supplier_id, name, order_refs, batch_refs) in enumerate(rows):
+            name_item = QTableWidgetItem(name)
+            name_item.setData(Qt.UserRole, supplier_id)
+            refs = order_refs + batch_refs
+            usage = f"{order_refs} order(s), {batch_refs} batch(es)" if refs else "unused"
+            usage_item = QTableWidgetItem(usage)
+            usage_item.setData(Qt.UserRole, refs)
+            self.table.setItem(r, 0, name_item)
+            self.table.setItem(r, 1, usage_item)
+        self.sync_buttons()
+
+    def selected_supplier(self):
+        selected = self.table.selectionModel().selectedRows()
+        if not selected:
+            return None
+        row = selected[0].row()
+        return (self.table.item(row, 0).data(Qt.UserRole),   # id
+                self.table.item(row, 0).text(),              # name
+                self.table.item(row, 1).data(Qt.UserRole))   # ref count
+
+    def sync_buttons(self):
+        picked = self.selected_supplier()
+        self.rename_button.setEnabled(picked is not None)
+        self.delete_button.setEnabled(picked is not None and picked[2] == 0)
+
+    def handle_rename(self):
+        picked = self.selected_supplier()
+        if not picked:
+            return
+        supplier_id, old_name, _refs = picked
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Supplier", "New name:", text=old_name
+        )
+        if not ok or new_name.strip() == old_name:
+            return
+        try:
+            rename_supplier(supplier_id, new_name)
+        except ValueError as e:
+            QMessageBox.warning(self, "Cannot Rename", str(e))
+            return
+        self.reload()
+
+    def handle_delete(self):
+        picked = self.selected_supplier()
+        if not picked:
+            return
+        supplier_id, name, _refs = picked
+        if QMessageBox.question(
+            self, "Confirm Delete", f"Delete supplier '{name}'?"
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            delete_supplier(supplier_id)
+        except ValueError as e:
+            QMessageBox.warning(self, "Cannot Delete", str(e))
+            return
+        self.reload()
+
 
 class restock_page(QWidget):
     def __init__(self):
@@ -340,12 +433,19 @@ class restock_page(QWidget):
             self.order_button.clicked.connect(self.handle_mark_ordered)
             self.receive_button = QPushButton("Mark Received")
             self.receive_button.clicked.connect(self.handle_mark_received)
+            self.delete_button = QPushButton("Delete")
+            self.delete_button.clicked.connect(self.handle_delete)
+
+            self.suppliers_button = QPushButton("Suppliers…")
+            self.suppliers_button.clicked.connect(self.handle_manage_suppliers)
 
             control_bar.addWidget(QLabel("Filter:"))
             control_bar.addWidget(self.filter_combo)
+            control_bar.addWidget(self.suppliers_button)
             control_bar.addStretch()
             control_bar.addWidget(self.order_button)
             control_bar.addWidget(self.receive_button)
+            control_bar.addWidget(self.delete_button)
 
             self.item_table = SectionTable(["Status", "Item Code", "Part Name", "Supplier", "Qty", "Unit Cost", "Requested", "Ordered", "Received"])
             self.item_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -387,10 +487,12 @@ class restock_page(QWidget):
         if not selected:
             self.order_button.setEnabled(False)
             self.receive_button.setEnabled(False)
+            self.delete_button.setEnabled(False)
             return
         statuses = {self.item_table.item(idx.row(), 0).text() for idx in selected}
         self.order_button.setEnabled(statuses == {"PENDING"})
         self.receive_button.setEnabled(statuses == {"ORDERED"})
+        self.delete_button.setEnabled(statuses == {"PENDING"})
 
     def add_item(self, item_id):
         notes = self.notes_input.toPlainText().strip()
@@ -413,7 +515,6 @@ class restock_page(QWidget):
         
         self.add_item(item_id)
         self.reload()
-
 
     def selected_item_ids(self):
         ids = []
@@ -468,3 +569,20 @@ class restock_page(QWidget):
             QMessageBox.warning(self, "Cannot Receive", str(e))
             return
         self.reload()
+
+    def handle_delete(self):
+        selected = self.item_table.selectionModel().selectedRows()
+        if not selected:
+            return
+        lines = [self.item_table.item(idx.row(), 2).text() for idx in selected]
+        if QMessageBox.question(
+            self, "Confirm Delete",
+            "Delete these requests?\n\n" + "\n".join(lines)
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        delete_request_items(self.selected_item_ids())
+        self.reload()
+
+    def handle_manage_suppliers(self):
+        SupplierManagerDialog(self).exec()
+        self.reload()   # renames may have changed names shown in the item table

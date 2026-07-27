@@ -55,3 +55,15 @@ def mark_items_received(item_ids):
                 UPDATE request_items SET status = 'RECEIVED', received_on = ?
                 WHERE id = ?
             """, (date, item_id))
+
+def revert_items_to_pending(item_ids):
+    if not item_ids:
+        return
+    placeholders = ",".join("?" for _ in item_ids)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            UPDATE request_items
+            SET status = 'PENDING', supplier_id = NULL, quantity = NULL, unit_cost = NULL, ordered_on = NULL
+            WHERE id in ({placeholders}) AND status = 'ORDERED'
+        """, item_ids)
