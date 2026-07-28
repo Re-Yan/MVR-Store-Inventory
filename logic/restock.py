@@ -45,7 +45,7 @@ def get_request_items(statuses=None):
 
         query = """
             SELECT ri.id, ri.status, p.sku, p.part_name, s.name, 
-            ri.quantity, ri.unit_cost, ri.created_on, ri.ordered_on, ri.received_on
+            ri.quantity, ri.unit_cost, ri.created_on, ri.ordered_on, ri.received_on, ri.notes
             FROM request_items ri
             INNER JOIN parts p ON ri.part_id = p.id
             LEFT JOIN suppliers s ON ri.supplier_id = s.id

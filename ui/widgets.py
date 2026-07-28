@@ -61,13 +61,13 @@ from logic.restock_transitions import (
 )
 
 import sqlite3
-import traceback
 
 STATUS_COLORS = {
     "PENDING":     QColor("#b58900"),
     "ORDERED":     QColor("#2aa198"),
     "RECEIVED":    QColor("#888888"),
 }
+NOTE_TEXT_COLOR = QColor("#e67e22")
 
 FILTER_MAP = {
     "Active":   ["PENDING", "ORDERED"],
@@ -479,12 +479,18 @@ class restock_page(QWidget):
         self.item_table.setRowCount(len(rows))
         
         for r, row in enumerate(rows):
-            item_id, status, sku, part_name, supplier, quantity, unit_cost, requested, ordered, received = row
+            item_id, status, sku, part_name, supplier, quantity, unit_cost, requested, ordered, received, notes = row
             status_item = QTableWidgetItem(str(status))
             status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
             status_item.setData(Qt.UserRole, item_id)        # id lives on the row for Step 5
             self.item_table.setItem(r, 0, status_item)
-            self.item_table.setItem(r, 1, QTableWidgetItem(str(sku)))
+
+            sku_item = QTableWidgetItem(str(sku))
+            if notes:
+                sku_item.setToolTip(notes)
+                sku_item.setForeground(NOTE_TEXT_COLOR)
+            self.item_table.setItem(r, 1, sku_item)
+
             self.item_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
             self.item_table.setItem(r, 3, QTableWidgetItem(str(supplier or "")))
             self.item_table.setItem(r, 4, QTableWidgetItem(str(quantity if quantity is not None else "")))
