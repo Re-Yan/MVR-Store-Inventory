@@ -2,3 +2,4 @@
 inventory-system/
 *.pyc
 *.db
+*.claude

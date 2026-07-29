@@ -6,69 +6,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "mvr_inventory.db")
 CSV_FOLDER = os.path.join(BASE_DIR, "data", "csv_files")
 
-def ensure_transactions_use_sku_fk(cursor):
-    cursor.execute("PRAGMA table_info(transactions)")
-    columns = cursor.fetchall()
-    if not columns:
-        return
-
-    part_id_column = next((col for col in columns if col[1] == 'part_id'), None)
-    part_id_type = (part_id_column[2] if part_id_column else "").upper()
-
-    cursor.execute("PRAGMA foreign_key_list(transactions)")
-    fks = cursor.fetchall()
-    has_sku_fk = any(
-        fk[2] == 'parts' and fk[3] == 'part_id' and fk[4] == 'sku'
-        for fk in fks
-    )
-
-    if part_id_type == 'TEXT' and has_sku_fk:
-        return
-
-    cursor.execute("PRAGMA foreign_keys = OFF")
-    cursor.execute("DROP VIEW IF EXISTS v_transactions_with_revenue")
-
-    cursor.execute("""
-        CREATE TABLE transactions_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            part_id TEXT NOT NULL,
-            transaction_type TEXT NOT NULL,
-            cost_at_time INTEGER NOT NULL,
-            sale_at_time INTEGER NOT NULL,
-            notes TEXT,
-            FOREIGN KEY (part_id) REFERENCES parts(sku)
-            )
-        """)
-
-    cursor.execute("""
-        INSERT INTO transactions_new
-        (id, timestamp, quantity, part_id, transaction_type, cost_at_time, sale_at_time, notes)
-        SELECT
-            t.id,
-            t.timestamp,
-            t.quantity,
-            COALESCE(
-                (
-                    SELECT p.sku
-                    FROM parts p
-                    WHERE p.sku = CAST(t.part_id AS TEXT)
-                       OR ltrim(p.sku, '0') = ltrim(CAST(t.part_id AS TEXT), '0')
-                    LIMIT 1
-                ),
-                CAST(t.part_id AS TEXT)
-            ),
-            t.transaction_type,
-            t.cost_at_time,
-            t.sale_at_time,
-            t.notes
-        FROM transactions t
-        """)
-
-    cursor.execute("DROP TABLE transactions")
-    cursor.execute("ALTER TABLE transactions_new RENAME TO transactions")
-    cursor.execute("PRAGMA foreign_keys = ON")
 
 def initialize_database():
     conn = sqlite3.connect(DB_PATH)
@@ -118,12 +55,14 @@ def initialize_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL, -- Date Format: YYYY-MM-DD
             quantity INTEGER NOT NULL,
-            part_id TEXT NOT NULL,
+            part_id INTEGER NOT NULL,
+            batch_id INTEGER,
             transaction_type TEXT NOT NULL, 
             cost_at_time INTEGER NOT NULL, 
             sale_at_time INTEGER NOT NULL,
             notes TEXT,
-            FOREIGN KEY (part_id) REFERENCES parts(sku)
+            FOREIGN KEY (part_id) REFERENCES parts(id),
+            FOREIGN KEY (batch_id) REFERENCES stock_batches(id)
             )
         """)
 
@@ -145,8 +84,6 @@ def initialize_database():
         CREATE INDEX IF NOT EXISTS idx_aliases_part_id
         ON aliases(part_id)
     """)
-
-    ensure_transactions_use_sku_fk(cursor)
 
     conn.commit()
     return conn
@@ -176,6 +113,82 @@ def create_revenue_view():
 
     conn.commit()
     conn.close()
+
+def create_restock_tables():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("PRAGMA foreign_keys = ON;")
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL COLLATE NOCASE
+                       )
+                        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS request_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part_id INTEGER NOT NULL,
+                supplier_id INTEGER, 
+                quantity INTEGER,
+                unit_cost INTEGER,
+                urgency_score INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'PENDING'
+                    CHECK(status IN ('PENDING', 'ORDERED', 'RECEIVED')),
+                created_on TEXT NOT NULL DEFAULT CURRENT_DATE,
+                ordered_on TEXT,
+                received_on TEXT,
+                notes TEXT,
+                       
+                FOREIGN KEY (part_id) REFERENCES parts(id),
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                       )
+                        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS stock_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part_id INTEGER NOT NULL,
+                supplier_id INTEGER,
+                request_item_id INTEGER,
+                qty_received INTEGER NOT NULL,
+                qty_remaining INTEGER NOT NULL,
+                unit_cost INTEGER NOT NULL,
+                received_on TEXT NOT NULL,
+                CHECK (qty_remaining >= 0 AND qty_remaining <= qty_received),
+                
+                FOREIGN KEY (part_id) REFERENCES parts(id),
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                FOREIGN KEY (request_item_id) REFERENCES request_items(id)
+                      )
+                        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_batches_fifo
+            ON stock_batches(part_id, received_on)
+                        """)
+    
+        conn.commit()
+
+def seed_opening_batches():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")    
+        cursor.execute("""
+            INSERT INTO stock_batches
+                (part_id, supplier_id, request_item_id, qty_received, qty_remaining, unit_cost, received_on)
+            SELECT p.id, NULL, NULL, p.current_stock, p.current_stock, p.base_cost_price, DATE('now', 'localtime')
+            FROM parts p
+            WHERE p.current_stock > 0
+                AND NOT EXISTS (
+                       SELECT 1 FROM stock_batches b 
+                       WHERE b.part_id = p.id
+                       )
+                        """)
+        conn.commit()
+
 
 def migrate_csv_to_sql():
     conn = sqlite3.connect(DB_PATH)
@@ -253,33 +266,25 @@ def migrate_csv_to_sql():
                 
                 is_active = row_dict.get('is_active')
                 is_active = int(is_active) if is_active and is_active.strip() else None
-                
+
+                def to_int(value):
+                    if value is None:
+                        return 0
+                    cleaned = value.replace(',', '').strip()
+                    return int(cleaned) if cleaned else 0
+
+                current_stock = to_int(row_dict.get('current_stock'))
+                base_cost_price = to_int(row_dict.get('base_cost_price'))
+                srp_price = to_int(row_dict.get('srp_price'))
+
                 cursor.execute("""
-                    INSERT OR IGNORE INTO parts 
+                    INSERT OR IGNORE INTO parts
                     (sku, part_name, base_cost_price, srp_price, current_stock, shelf_id, stock_warning, is_active)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    row_dict.get('sku'), row_dict.get('part_name'), 
-                    row_dict.get('base_cost_price'), row_dict.get('srp_price'), 
-                    row_dict.get('current_stock'), shelf_id, stock_warning, is_active
-                ))
-
-    # 5. Migrate Transactions
-    trans_file = os.path.join(CSV_FOLDER, 'transactions.csv')
-    if os.path.exists(trans_file):
-        # Transactions CSV is treated as a full snapshot, so clear existing rows first.
-        cursor.execute("DELETE FROM transactions")
-        with open(trans_file, mode='r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                cursor.execute("""
-                    INSERT INTO transactions 
-                    (timestamp, quantity, part_id, transaction_type, cost_at_time, sale_at_time, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    row.get('timestamp'), row.get('quantity'), normalize_id(row.get('part_id')), 
-                    row.get('transaction_type'), row.get('cost_at_time'), 
-                    row.get('sale_at_time'), row.get('notes')
+                    row_dict.get('sku'), row_dict.get('part_name'),
+                    base_cost_price, srp_price,
+                    current_stock, shelf_id, stock_warning, is_active
                 ))
 
     # 6. Migrate Aliases
@@ -315,5 +320,7 @@ def migrate_csv_to_sql():
 
 if __name__ == "__main__":
     initialize_database()
+    create_restock_tables()
     migrate_csv_to_sql()
     create_revenue_view()
+    seed_opening_batches()
