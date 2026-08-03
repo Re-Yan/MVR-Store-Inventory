@@ -51,20 +51,34 @@ def initialize_database():
         """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL, -- Date Format: YYYY-MM-DD
-            quantity INTEGER NOT NULL,
-            part_id INTEGER NOT NULL,
-            batch_id INTEGER,
-            transaction_type TEXT NOT NULL, 
-            cost_at_time INTEGER NOT NULL, 
-            sale_at_time INTEGER NOT NULL,
-            notes TEXT,
-            FOREIGN KEY (part_id) REFERENCES parts(id),
-            FOREIGN KEY (batch_id) REFERENCES stock_batches(id)
+        CREATE TABLE IF NOT EXISTS sales (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_date   TEXT NOT NULL,
+            logged_on   TEXT NOT NULL,
+            total_price INTEGER NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'ACTIVE'
+                        CHECK (status IN ('ACTIVE', 'VOIDED')),
+            voided_on   TEXT,
+            notes       TEXT
             )
         """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS transactions (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id         INTEGER NOT NULL,
+            part_id         INTEGER NOT NULL,
+            batch_id        INTEGER NOT NULL,
+            quantity        INTEGER NOT NULL CHECK (quantity > 0),
+            cost_at_time    INTEGER NOT NULL,
+            sale_at_time    INTEGER NOT NULL,
+            FOREIGN KEY (sale_id)   REFERENCES sales(id),
+            FOREIGN KEY (part_id)   REFERENCES parts(id),
+            FOREIGN KEY (batch_id)  REFERENCES stock_batches(id)
+            )
+        """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tx_sale ON transactions(sale_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tx_part ON transactions(part_id)")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS aliases (
@@ -88,31 +102,6 @@ def initialize_database():
     conn.commit()
     return conn
 
-def create_revenue_view():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT name
-        FROM sqlite_master
-        WHERE type='table' AND name='transactions'
-    """)
-    if cursor.fetchone() is None:
-        conn.close()
-        raise RuntimeError("transactions table not found. Run initialize_database() and migrate_csv_to_sql() first.")
-
-    cursor.execute("DROP VIEW IF EXISTS v_transactions_with_revenue")
-
-    cursor.execute("""
-        CREATE VIEW v_transactions_with_revenue AS
-            SELECT 
-                *,
-                (sale_at_time - (quantity * cost_at_time)) AS revenue
-            FROM transactions;                  
-                   """)
-
-    conn.commit()
-    conn.close()
 
 def create_restock_tables():
     with sqlite3.connect(DB_PATH) as conn:
@@ -172,6 +161,49 @@ def create_restock_tables():
     
         conn.commit()
 
+def create_sales_view():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='table' AND name='transactions'
+    """)
+    if cursor.fetchone() is None:
+        conn.close()
+        raise RuntimeError("transactions table not found. Run initialize_database() and migrate_csv_to_sql() first.")
+
+    # this code will need to be revisited if we enable market basket analysis (grouping of sales)
+    cursor.execute("DROP VIEW IF EXISTS v_sale_lines_with_revenue")
+    cursor.execute("""
+        CREATE VIEW v_sale_lines_with_revenue AS
+        SELECT t.id AS line_id, t.sale_id, s.sale_date, s.status, t.part_id,
+                t.batch_id, t.quantity, t.cost_at_time, t.sale_at_time,
+                (t.sale_at_time - t.quantity * t.cost_at_time) AS revenue
+        FROM transactions t
+        JOIN sales s ON t.sale_id = s.id; 
+                   """)
+
+    cursor.execute("DROP VIEW IF EXISTS v_sales_summary")
+    cursor.execute("DROP VIEW IF EXISTS v_transactions_with_revenue")
+    cursor.execute("""
+        CREATE VIEW v_sales_summary AS
+        SELECT s.id AS sale_id, s.sale_date, s.logged_on, s.status, s.voided_on, s.total_price, s.notes,
+            p.sku, p.part_name,
+            SUM(t.quantity)                                     AS quantity,
+            SUM(t.quantity * t.cost_at_time)                    AS total_cost,
+            s.total_price - SUM(t.quantity * t.cost_at_time)    AS revenue,
+            COUNT(t.id)                                         AS line_count
+        FROM sales s
+        JOIN transactions t ON t.sale_id = s.id
+        JOIN parts p ON t.part_id = p.id
+        GROUP BY s.id;
+    """)
+
+    conn.commit()
+    conn.close()
+
 def seed_opening_batches():
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
@@ -188,7 +220,6 @@ def seed_opening_batches():
                        )
                         """)
         conn.commit()
-
 
 def migrate_csv_to_sql():
     conn = sqlite3.connect(DB_PATH)
@@ -322,5 +353,5 @@ if __name__ == "__main__":
     initialize_database()
     create_restock_tables()
     migrate_csv_to_sql()
-    create_revenue_view()
+    create_sales_view()
     seed_opening_batches()
