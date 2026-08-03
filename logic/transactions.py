@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 from logic.db_connection import get_connection
 
 def search_suggestions(search_term):
@@ -90,12 +91,14 @@ def query_transaction_date(date_string, parent=None):
     except sqlite3.Error as e:
         raise RuntimeError(f"Database Query failed: {e}") from e
 
-def insert_transaction(date, quantity, sku, total_price):
+def record_sale(sale_date, sku, quantity, total_price, notes=""):
     if quantity < 1:
         raise ValueError("Quantity must be at least 1")
     total_price = int(round(total_price))
     if total_price < 0:
         raise ValueError("Price cannot be negative")
+
+    logged_on = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -135,37 +138,44 @@ def insert_transaction(date, quantity, sku, total_price):
             splits.append((batch_id, take, unit_cost))
             remaining -= take
 
-        # 4. Allocate the total price across splits (remainder on last row)
+        # 4. Header first — its id stitches the lines together
+        cursor.execute("""
+            INSERT INTO sales (sale_date, logged_on, total_price, status, notes)
+            VALUES (?, ?, ?, 'ACTIVE', ?)
+        """, (sale_date, logged_on, total_price, notes))
+        sale_id = cursor.lastrowid
+
+        # 5. Lines + batch drawdown, allocating price across splits
         allocated = 0
-        rows_to_insert = []
         for i, (batch_id, take, unit_cost) in enumerate(splits):
             if i == len(splits) - 1:
-                row_total = total_price - allocated
+                line_total = total_price - allocated      # remainder lands here
             else:
-                row_total = round(total_price * take / quantity)
-                allocated += row_total
-            rows_to_insert.append((batch_id, take, unit_cost, row_total))
+                line_total = round(total_price * take / quantity)
+                allocated += line_total
 
-        # 5. Write everything
-        for batch_id, take, unit_cost, row_total in rows_to_insert:
             cursor.execute("""
                 INSERT INTO transactions
-                    (timestamp, quantity, part_id, batch_id,
-                     transaction_type, cost_at_time, sale_at_time, notes)
-                VALUES (?, ?, ?, ?, 'SALE', ?, ?, '')
-            """, (date, take, part_id, batch_id, unit_cost, row_total))
+                    (sale_id, part_id, batch_id, quantity, cost_at_time, sale_at_time)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (sale_id, part_id, batch_id, take, unit_cost, line_total))
 
             cursor.execute("""
                 UPDATE stock_batches SET qty_remaining = qty_remaining - ?
                 WHERE id = ?
             """, (take, batch_id))
 
+        # 6. Denormalized mirror
         cursor.execute("""
             UPDATE parts SET current_stock = current_stock - ?
             WHERE id = ?
         """, (quantity, part_id))
 
-    return [(take, unit_cost) for _, take, unit_cost, _ in rows_to_insert]
+    return {
+        "sale_id": sale_id,
+        "splits": [(take, unit_cost) for _batch, take, unit_cost in splits],
+        "remaining_stock": available - quantity,
+    }
 
 def check_stock_consistency():
     with get_connection() as conn:
