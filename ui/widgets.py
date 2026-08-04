@@ -36,10 +36,10 @@ from PySide6.QtGui import (
 )
 
 from datetime import datetime
-from logic.transactions import ( 
-    query_transaction_date, 
-    insert_transaction, 
-    search_suggestions 
+from logic.transactions import (
+    get_sales_for_date,
+    record_sale,
+    search_suggestions
 )
 
 from logic.restock import (
@@ -66,6 +66,8 @@ STATUS_COLORS = {
     "PENDING":     QColor("#b58900"),
     "ORDERED":     QColor("#2aa198"),
     "RECEIVED":    QColor("#888888"),
+    "ACTIVE":      QColor("#2aa198"),
+    "VOIDED":      QColor("#888888"),
 }
 NOTE_TEXT_COLOR = QColor("#e67e22")
 
@@ -128,7 +130,7 @@ class LogSection(QWidget):
         date = datetime.now().strftime("%Y-%m-%d")
 
         try:
-            splits = insert_transaction(date, quantity, sku, price)
+            result = record_sale(date, sku, quantity, price)
         except ValueError as e:
             QMessageBox.warning(self, "Sale Blocked", str(e))
             return
@@ -136,8 +138,12 @@ class LogSection(QWidget):
             QMessageBox.critical(self, "Database Error", str(e))
             return
 
-        detail = ", ".join(f"{qty} @ ₱{cost}" for qty, cost in splits)
-        QMessageBox.information(self, "Sale Recorded", f"Sold {quantity} × {sku}\nCost basis: {detail}")
+        detail = ", ".join(f"{qty} @ ₱{cost}" for qty, cost in result["splits"])
+        QMessageBox.information(
+            self, "Sale Recorded",
+            f"Sold {quantity} × {sku}\nCost basis: {detail}\n"
+            f"Remaining stock: {result['remaining_stock']}"
+        )
         self.sku_input.clear()
         self.qty_input.setValue(1)
         self.price_input.setValue(0)
@@ -222,7 +228,7 @@ class transaction_page(QWidget):
         self.date_input.setDisplayFormat("yyyy-MM-dd")
         self.date_input.setCalendarPopup(True)
 
-        self.result_table = SectionTable(["Date", "Part ID", "Part Name", "Quantity", "Amount Sold", "Type", "Revenue"])
+        self.result_table = SectionTable(["Time", "Item Code", "Part Name", "Qty", "Total", "Revenue", "Status"])
 
         transaction_button = QPushButton("Submit")
         transaction_button.clicked.connect(self.handle_submit)
@@ -233,27 +239,43 @@ class transaction_page(QWidget):
         layout.addWidget(self.result_table)
 
     def populate_table(self, results):
-        print(type(results))
         self.result_table.setRowCount(0)
         self.result_table.setRowCount(len(results))
 
-        for row_idx, row_data in enumerate(results):
-            for col_idx, value in enumerate(row_data):
-                item = QTableWidgetItem(str(value))
-                self.result_table.setItem(row_idx, col_idx, item)
+        for r, row in enumerate(results):
+            (sale_id, logged_on, sku, part_name, quantity,
+             total_price, revenue, status, line_count, notes) = row
 
+            sku_item = QTableWidgetItem(str(sku))
+            if notes:
+                sku_item.setToolTip(notes)
+                sku_item.setForeground(NOTE_TEXT_COLOR)
+
+            status_item = QTableWidgetItem(str(status))
+            status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
+            status_item.setData(Qt.UserRole, sale_id)   # id lives on the row for the void button
+
+            # A sale drawn from more than one batch is worth flagging.
+            qty_text = f"{quantity} ({line_count} batches)" if line_count > 1 else str(quantity)
+
+            self.result_table.setItem(r, 0, QTableWidgetItem(str(logged_on)))
+            self.result_table.setItem(r, 1, sku_item)
+            self.result_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
+            self.result_table.setItem(r, 3, QTableWidgetItem(qty_text))
+            self.result_table.setItem(r, 4, QTableWidgetItem(f"₱{total_price}"))
+            self.result_table.setItem(r, 5, QTableWidgetItem(f"₱{revenue}"))
+            self.result_table.setItem(r, 6, status_item)
 
     def handle_submit(self):
         date_string = self.date_input.date().toString("yyyy-MM-dd")
 
         try:
-            results = query_transaction_date(date_string)
-        except (RuntimeError, ValueError) as e:
-            QMessageBox.critical(self, "Error Occured", str(e))
+            results = get_sales_for_date(date_string)
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
             return
-        
-        print(results)
-        self.populate_table(results)
+
+        self.populate_table(results)   # an empty day is a valid result, not an error
 
 class OrderDetailsDialog(QDialog):
     """Collects the supplier for the order plus quantity and unit cost per item."""

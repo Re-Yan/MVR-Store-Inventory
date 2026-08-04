@@ -61,35 +61,41 @@ def search_suggestions(search_term):
         print(f"Search Error: {e}")
         return []
 
-def query_transaction_date(date_string, parent=None):
-    
-    query = """
-            SELECT
-                t.timestamp,
-                p.sku,
-                p.part_name,
-                t.quantity,
-                t.sale_at_time,
-                t.transaction_type,
-                t.revenue
-            FROM v_transactions_with_revenue t
-            INNER JOIN parts p ON t.part_id = p.id
-            WHERE t.timestamp LIKE ?
-            ORDER BY t.id DESC
-        """
+def get_sales_for_date(sale_date):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT sale_id, logged_on, sku, part_name, quantity,
+                    total_price, revenue, status, line_count, notes
+            FROM v_sales_summary
+            WHERE sale_date = ?
+            ORDER BY logged_on DESC, sale_id DESC
+        """, (sale_date,))
+        return cursor.fetchall()
 
-    try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (f"{date_string}%",))
-            results = cursor.fetchall()
-
-            if not results:
-                raise ValueError(f"No transactions found for date: {date_string}")
-        return results
-
-    except sqlite3.Error as e:
-        raise RuntimeError(f"Database Query failed: {e}") from e
+def get_part_snapshot(sku):
+    """Everything the log form needs about a part in one round trip.
+    Returns None for an unknown SKU — the form calls this as the user types."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT p.id, p.part_name, p.srp_price, p.stock_warning,
+                   COALESCE((SELECT SUM(qty_remaining)
+                             FROM stock_batches WHERE part_id = p.id), 0)
+            FROM parts p
+            WHERE p.sku = ?
+        """, (sku,))
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        part_id, part_name, srp_price, stock_warning, available = row
+        return {
+            "part_id": part_id,
+            "part_name": part_name,
+            "srp_price": srp_price,
+            "stock_warning": stock_warning,
+            "available": available,
+        }
 
 def record_sale(sale_date, sku, quantity, total_price, notes=""):
     if quantity < 1:
@@ -115,7 +121,7 @@ def record_sale(sale_date, sku, quantity, total_price, notes=""):
             SELECT COALESCE(SUM(qty_remaining), 0)
             FROM stock_batches WHERE part_id = ?
         """, (part_id,))
-        available = cursor.fetchone()[0]
+        available = cursor.fetchone()[0] # the total available amount of a specific item
         if available < quantity:
             raise ValueError(
                 f"Insufficient stock for {sku}: {available} available, {quantity} requested"
@@ -176,6 +182,54 @@ def record_sale(sale_date, sku, quantity, total_price, notes=""):
         "splits": [(take, unit_cost) for _batch, take, unit_cost in splits],
         "remaining_stock": available - quantity,
     }
+
+def void_sale(sale_id):
+    voided_on = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # 1. Guard — only ACTIVE sales can be voided
+        cursor.execute("SELECT status FROM sales WHERE id = ?", (sale_id,))
+        row = cursor.fetchone()
+        if row is None:
+            raise ValueError(f"Sale {sale_id} not found")
+        if row[0] != 'ACTIVE':
+            raise ValueError(f"Sale {sale_id} is already {row[0]}")
+
+        # 2. The lines tell us exactly what to give back
+        cursor.execute("""
+            SELECT batch_id, part_id, quantity
+            FROM transactions WHERE sale_id = ?
+        """, (sale_id,))
+        lines = cursor.fetchall()
+        if not lines:
+            raise ValueError(f"Sale {sale_id} has no line items")
+
+        # 3. Restore each batch it drew from
+        for batch_id, _part_id, qty in lines:
+            cursor.execute("""
+                UPDATE stock_batches SET qty_remaining = qty_remaining + ?
+                WHERE id = ?
+            """, (qty, batch_id))
+
+        # 4. Restore the denormalized stock, grouped by part
+        totals = {}
+        for _batch_id, part_id, qty in lines:
+            totals[part_id] = totals.get(part_id, 0) + qty
+        for part_id, qty in totals.items():
+            cursor.execute("""
+                UPDATE parts SET current_stock = current_stock + ?
+                WHERE id = ?
+            """, (qty, part_id))
+
+        # 5. Flip the header — lines stay untouched, that's the audit trail
+        cursor.execute("""
+            UPDATE sales SET status = 'VOIDED', voided_on = ?
+            WHERE id = ?
+        """, (voided_on, sale_id))
+
+    return {"sale_id": sale_id, "restored": sum(qty for _b, _p, qty in lines)}
 
 def check_stock_consistency():
     with get_connection() as conn:
