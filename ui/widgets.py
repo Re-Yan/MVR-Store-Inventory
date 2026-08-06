@@ -134,6 +134,7 @@ class LogSection(QWidget):
 
         self.date_input = QDateEdit()
         self.date_input.setDate(QDate.currentDate())
+        self.date_input.setMaximumDate(QDate.currentDate())
         self.date_input.setDisplayFormat("yyyy-MM-dd")
         self.date_input.setCalendarPopup(True)
 
@@ -183,6 +184,7 @@ class LogSection(QWidget):
         return panel
 
     def reload(self):
+        self.date_input.setMaximumDate(QDate.currentDate())
         sale_date = self.date_input.date().toString("yyyy-MM-dd")
         try:
             rows = get_sales_for_date(sale_date)
@@ -297,6 +299,10 @@ class LogSection(QWidget):
         self.price_input.selectAll()
 
     def handle_submit(self):
+        if self.lookup_timer.isActive():
+            self.lookup_timer.stop()
+            self.refresh_part_context()
+
         sku = self.sku_input.text().strip()
         if not sku:
             QMessageBox.warning(self, "Missing Input", "Please enter a SKU")
@@ -306,6 +312,15 @@ class LogSection(QWidget):
         price = self.price_input.value()
         notes = self.notes_input.text().strip()
         sale_date = self.date_input.date().toString("yyyy-MM-dd")
+
+        if price == 0 and QMessageBox.question(
+            self, "Zero-Price Sale",
+            f"Log {quantity} x {sku} for ₱0?\n\n"
+            "Consider adding a note explaining why",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        ) != QMessageBox.StandardButton.Yes:
+            return
 
         try:
             result = record_sale(sale_date, sku, quantity, price, notes)

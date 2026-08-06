@@ -98,6 +98,13 @@ def get_part_snapshot(sku):
         }
 
 def record_sale(sale_date, sku, quantity, total_price, notes=""):
+    try:
+        parsed_date = datetime.strptime(sale_date, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise ValueError(f"Sale date must be YYYY-MM-DD, got {sale_date!r}")
+    if parsed_date > datetime.now().date():
+        raise ValueError(f"Cannot log a sale dated in the future: {sale_date}")
+
     if quantity < 1:
         raise ValueError("Quantity must be at least 1")
     total_price = int(round(total_price))
