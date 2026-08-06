@@ -18,14 +18,12 @@ class MainWindow(QMainWindow):
         Main_layout = QHBoxLayout(central_widget)
         
         transaction_section = transaction_page("Transaction Search")
-        log_section = LogSection("Log Section")
+        log_section = LogSection("Log Sale")
         restock_section = restock_page()
-        
-        # Create a callback that fills the SKU field when a suggestion is selected
-        def on_suggestion_selected(sku):
-            log_section.sku_input.setText(sku)
-        
-        search_Section = SearchSection("Enter Part Number", "Search", "Search Section", on_selection=on_suggestion_selected) 
+
+        # The Log page resolves SKUs with its own inline completer, so Search
+        # stands on its own as a lookup page instead of filling a field on another.
+        search_Section = SearchSection("Enter Part Number", "Search", "Search Section")
         Main_layout.addWidget(search_Section)
         
         navigation_sideBar = QWidget()

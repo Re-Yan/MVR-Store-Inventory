@@ -10,15 +10,15 @@ from PySide6.QtWidgets import (
     QTableWidget, 
     QTableWidgetItem, 
     QMessageBox, 
-    QSpinBox, 
-    QDoubleSpinBox, 
-    QListView, 
+    QSpinBox,
+    QListView,
     QPlainTextEdit,
     QComboBox,
     QAbstractItemView,
     QDialog,
     QDialogButtonBox,
-    QInputDialog
+    QInputDialog,
+    QCompleter
 )
 
 from PySide6.QtCore import (
@@ -35,11 +35,12 @@ from PySide6.QtGui import (
     QKeySequence
 )
 
-from datetime import datetime
 from logic.transactions import (
     get_sales_for_date,
+    get_part_snapshot,
     record_sale,
-    search_suggestions
+    search_suggestions,
+    void_sale
 )
 
 from logic.restock import (
@@ -84,53 +85,230 @@ FILTER_MAP = {
 class LogSection(QWidget):
     def __init__(self, label):
         super().__init__()
-        form_layout = QFormLayout()
-        section_label = QLabel(label)
+        self.snapshot = None
+        self.snapshot_sku = None    # which SKU self.snapshot describes
+        self._display_to_sku = {}
 
-        # Input Widgets for QFormLayout
+        main_layout = QHBoxLayout(self)
+        main_layout.addWidget(self.build_entry_panel(label), 1)
+        main_layout.addWidget(self.build_sales_panel(), 2)
+
+        self.date_input.dateChanged.connect(self.reload)
+        self.reload()
+
+    def build_entry_panel(self, label):
+        panel = QWidget()
+        layout = QFormLayout(panel)
+
         self.sku_input = QLineEdit()
-        self.sku_input.setPlaceholderText("Enter SKU")
+        self.sku_input.setPlaceholderText("SKU, part name, or alias")
+
+        # Inline suggestions, fed by the same search the Search page uses.
+        self.completer_model = QStringListModel(self)
+        self.completer = QCompleter(self)
+        self.completer.setModel(self.completer_model)
+        self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.completer.activated.connect(self.on_suggestion_picked)
+        self.sku_input.setCompleter(self.completer)
+
+        self.lookup_timer = QTimer(self)
+        self.lookup_timer.setSingleShot(True)
+        self.lookup_timer.timeout.connect(self.refresh_part_context)
+        self.sku_input.textChanged.connect(lambda: self.lookup_timer.start(250))
+
+        self.part_label = QLabel("—")
+        self.part_label.setWordWrap(True)
+
         self.qty_input = QSpinBox()
-        self.price_input = QDoubleSpinBox()
+        self.qty_input.setRange(1, 100000)
+        self.qty_input.valueChanged.connect(self.autofill_price)
 
-        # Row Labels
-        form_layout.addRow(section_label)
-        form_layout.addRow("SKU:", self.sku_input)
-        form_layout.addRow("Quantity:", self.qty_input)
-        form_layout.addRow("Total Price:", self.price_input)
-
-        # Quantity Widget
-        self.qty_input.setRange(0, 100)
-        self.qty_input.setValue(1)
-        self.qty_input.setMinimum(1)
-        self.qty_input.setSingleStep(1)
-        
-        # Price Widget
-        self.price_input.setRange(0.0, 1000000.0)
-        self.price_input.setDecimals(1)
-        self.price_input.setSingleStep(1)
+        self.price_input = QSpinBox()          # pesos are integers in the schema
+        self.price_input.setRange(0, 10000000)
         self.price_input.setPrefix("₱")
-        self.price_input.setValue(0)
+        self.price_input.setGroupSeparatorShown(True)
 
-        # Submit Button
-        self.button = QPushButton("Submit")
-        self.button.clicked.connect(self.handle_submit)
-        form_layout.addRow(self.button)
+        self.notes_input = QLineEdit()
+        self.notes_input.setPlaceholderText("Optional")
 
-        self.setLayout(form_layout)
+        self.date_input = QDateEdit()
+        self.date_input.setDate(QDate.currentDate())
+        self.date_input.setDisplayFormat("yyyy-MM-dd")
+        self.date_input.setCalendarPopup(True)
+
+        self.submit_button = QPushButton("Log Sale")
+        self.submit_button.clicked.connect(self.handle_submit)
+
+        self.status_label = QLabel("")
+        self.status_label.setWordWrap(True)
+
+        layout.addRow(QLabel(label))
+        layout.addRow("SKU:", self.sku_input)
+        layout.addRow(self.part_label)
+        layout.addRow("Quantity:", self.qty_input)
+        layout.addRow("Total:", self.price_input)
+        layout.addRow("Notes:", self.notes_input)
+        layout.addRow("Sale date:", self.date_input)
+        layout.addRow(self.submit_button)
+        layout.addRow(self.status_label)
+
+        # Keyboard flow: SKU -> qty -> price -> submit
+        self.sku_input.returnPressed.connect(self.focus_qty)
+        self.qty_input.lineEdit().returnPressed.connect(self.focus_price)
+        self.price_input.lineEdit().returnPressed.connect(self.handle_submit)
+        submit_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
+        submit_shortcut.activated.connect(self.handle_submit)
+
+        return panel
+
+    def build_sales_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+
+        bar = QHBoxLayout()
+        self.day_total_label = QLabel("")
+        self.void_button = QPushButton("Void Sale")
+        self.void_button.clicked.connect(self.handle_void)
+        bar.addWidget(self.day_total_label)
+        bar.addStretch()
+        bar.addWidget(self.void_button)
+
+        self.sales_table = SalesTable()
+        self.sales_table.itemSelectionChanged.connect(self.sync_void_button)
+
+        layout.addLayout(bar)
+        layout.addWidget(self.sales_table)
+        self.sync_void_button()
+        return panel
+
+    def reload(self):
+        sale_date = self.date_input.date().toString("yyyy-MM-dd")
+        try:
+            rows = get_sales_for_date(sale_date)
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
+            return
+
+        self.sales_table.populate(rows)
+        self.sync_void_button()
+
+        active = [r for r in rows if r[7] == "ACTIVE"]
+        voided = len(rows) - len(active)
+        self.day_total_label.setText(
+            f"{sale_date}:  {len(active)} sale(s),  ₱{sum(r[5] for r in active)}"
+            + (f"   ({voided} voided)" if voided else "")
+        )
+
+    def sync_void_button(self):
+        picked = self.sales_table.selected_sale()
+        self.void_button.setEnabled(picked is not None and picked[1] == "ACTIVE")
+
+    def handle_void(self):
+        picked = self.sales_table.selected_sale()
+        if not picked:
+            return
+        sale_id, _status = picked
+        # Same row source as selected_sale(), so the two can never disagree.
+        row = self.sales_table.selectionModel().selectedRows()[0].row()
+        detail = (f"{self.sales_table.item(row, 3).text()} × "
+                  f"{self.sales_table.item(row, 1).text()} "
+                  f"({self.sales_table.item(row, 2).text()}) "
+                  f"for {self.sales_table.item(row, 4).text()}")
+
+        if QMessageBox.question(
+            self, "Confirm Void",
+            f"Void this sale?\n\n{detail}\n\n"
+            "Stock returns to the batches it came from. "
+            "The record is kept and marked VOIDED."
+        ) != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            void_sale(sale_id)
+        except ValueError as e:
+            QMessageBox.warning(self, "Cannot Void", str(e))
+            return
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
+            return
+
+        self.status_label.setText(f"Voided sale #{sale_id} — stock returned")
+        self.status_label.setStyleSheet("color: #888888;")
+        self.reload()
+
+    def refresh_part_context(self):
+        """Debounced: refill the suggestion list and the part context card."""
+        text = self.sku_input.text().strip()
+        if not text:
+            self.snapshot = None
+            self.snapshot_sku = None
+            self.part_label.setText("—")
+            self.completer_model.setStringList([])
+            return
+
+        self._display_to_sku = {}
+        labels = []
+        for sku, part_name, alias in search_suggestions(text):
+            label = f"{sku} | {part_name}" + (f" ({alias})" if alias else "")
+            labels.append(label)
+            self._display_to_sku[label] = sku
+        self.completer_model.setStringList(labels)
+
+        # The context card only fills once the text is an exact SKU.
+        self.snapshot = get_part_snapshot(text)
+        self.snapshot_sku = text if self.snapshot else None
+        if self.snapshot is None:
+            self.part_label.setText("no exact SKU match yet")
+            self.part_label.setStyleSheet("color: #888888;")
+            return
+
+        warn = self.snapshot["stock_warning"]
+        low = warn is not None and self.snapshot["available"] <= warn
+        self.part_label.setText(
+            f"{self.snapshot['part_name']}\n"
+            f"{self.snapshot['available']} available   |   SRP ₱{self.snapshot['srp_price']}"
+        )
+        self.part_label.setStyleSheet(f"color: {'#b58900' if low else '#2aa198'};")
+        self.autofill_price()
+
+    def on_suggestion_picked(self, display_text):
+        sku = self._display_to_sku.get(display_text)
+        if sku:
+            # Deferred so the completer finishes writing its own text first.
+            QTimer.singleShot(0, lambda: self.apply_sku(sku))
+
+    def apply_sku(self, sku):
+        self.sku_input.setText(sku)     # collapse the label to the bare SKU
+        self.refresh_part_context()
+        self.focus_qty()
+
+    def autofill_price(self):
+        """Total defaults to qty x SRP; typing over it always wins."""
+        if self.snapshot and self.snapshot["srp_price"]:
+            self.price_input.setValue(self.qty_input.value() * self.snapshot["srp_price"])
+
+    def focus_qty(self):
+        self.qty_input.setFocus()
+        self.qty_input.selectAll()
+
+    def focus_price(self):
+        self.price_input.setFocus()
+        self.price_input.selectAll()
 
     def handle_submit(self):
         sku = self.sku_input.text().strip()
-        
         if not sku:
-            QMessageBox.warning(self, "Missing Input", "Please Enter SKU")
+            QMessageBox.warning(self, "Missing Input", "Please enter a SKU")
             return
+
         quantity = self.qty_input.value()
         price = self.price_input.value()
-        date = datetime.now().strftime("%Y-%m-%d")
+        notes = self.notes_input.text().strip()
+        sale_date = self.date_input.date().toString("yyyy-MM-dd")
 
         try:
-            result = record_sale(date, sku, quantity, price)
+            result = record_sale(sale_date, sku, quantity, price, notes)
         except ValueError as e:
             QMessageBox.warning(self, "Sale Blocked", str(e))
             return
@@ -138,15 +316,36 @@ class LogSection(QWidget):
             QMessageBox.critical(self, "Database Error", str(e))
             return
 
-        detail = ", ".join(f"{qty} @ ₱{cost}" for qty, cost in result["splits"])
-        QMessageBox.information(
-            self, "Sale Recorded",
-            f"Sold {quantity} × {sku}\nCost basis: {detail}\n"
-            f"Remaining stock: {result['remaining_stock']}"
-        )
+        self.show_success(sku, quantity, price, result)
+        self.reset_form()
+        self.reload()
+
+    def show_success(self, sku, quantity, price, result):
+        parts = [f"✓ {quantity} × {sku} — ₱{price}"]
+        if len(result["splits"]) > 1:
+            basis = ", ".join(f"{q} @ ₱{c}" for q, c in result["splits"])
+            parts.append(f"{len(result['splits'])} batches ({basis})")
+
+        remaining = result["remaining_stock"]
+        # Only trust the threshold if the snapshot describes the SKU just sold --
+        # a fast typist can submit before the debounced lookup catches up.
+        fresh = self.snapshot if self.snapshot_sku == sku else None
+        warn = fresh["stock_warning"] if fresh else None
+        low = warn is not None and remaining <= warn
+        parts.append(f"{remaining} left" + (" ⚠ LOW" if low else ""))
+
+        self.status_label.setText("   |   ".join(parts))
+        self.status_label.setStyleSheet(f"color: {'#b58900' if low else '#2aa198'};")
+
+    def reset_form(self):
         self.sku_input.clear()
         self.qty_input.setValue(1)
         self.price_input.setValue(0)
+        self.notes_input.clear()
+        self.snapshot = None
+        self.snapshot_sku = None
+        self.part_label.setText("—")
+        self.sku_input.setFocus()   # ready for the next entry
 
 class SearchSection(QWidget):
     def __init__(self, lineText, buttonText, label, on_selection=None):
@@ -216,6 +415,53 @@ class SectionTable(QTableWidget):
 
         self.setEditTriggers(self.EditTrigger.NoEditTriggers)
 
+class SalesTable(SectionTable):
+    """One row per sale. Column 6 carries the sale_id for row actions."""
+    HEADERS = ["Time", "Item Code", "Part Name", "Qty", "Total", "Revenue", "Status"]
+
+    def __init__(self, parent=None):
+        super().__init__(self.HEADERS, parent)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.horizontalHeader().setStretchLastSection(True)
+
+    def populate(self, rows):
+        self.setRowCount(0)
+        self.setRowCount(len(rows))
+
+        for r, row in enumerate(rows):
+            (sale_id, logged_on, sku, part_name, quantity, total_price,
+             revenue, status, line_count, notes) = row
+
+            sku_item = QTableWidgetItem(str(sku))
+            if notes:
+                sku_item.setToolTip(notes)
+                sku_item.setForeground(NOTE_TEXT_COLOR)
+
+            status_item = QTableWidgetItem(str(status))
+            status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
+            status_item.setData(Qt.ItemDataRole.UserRole, sale_id)
+
+            qty_text = f"{quantity} ({line_count} batches)" if line_count > 1 else str(quantity)
+            time_text = logged_on.split(" ")[1] if " " in logged_on else logged_on
+
+            self.setItem(r, 0, QTableWidgetItem(time_text))
+            self.setItem(r, 1, sku_item)
+            self.setItem(r, 2, QTableWidgetItem(str(part_name)))            
+            self.setItem(r, 3, QTableWidgetItem(qty_text))
+            self.setItem(r, 4, QTableWidgetItem(f"₱{total_price}"))
+            self.setItem(r, 5, QTableWidgetItem(f"₱{revenue}"))
+            self.setItem(r, 6, status_item)
+
+    def selected_sale(self):
+        """(sale_id, status) for the selected row, or None."""
+        selected = self.selectionModel().selectedRows()
+        if not selected:
+            return None
+        cell = self.item(selected[0].row(), 6)
+        return (cell.data(Qt.ItemDataRole.UserRole), cell.text())
+
+
 class transaction_page(QWidget):
     def __init__(self, label):
         super().__init__()
@@ -228,7 +474,7 @@ class transaction_page(QWidget):
         self.date_input.setDisplayFormat("yyyy-MM-dd")
         self.date_input.setCalendarPopup(True)
 
-        self.result_table = SectionTable(["Time", "Item Code", "Part Name", "Qty", "Total", "Revenue", "Status"])
+        self.result_table = SalesTable()
 
         transaction_button = QPushButton("Submit")
         transaction_button.clicked.connect(self.handle_submit)
@@ -237,34 +483,6 @@ class transaction_page(QWidget):
         layout.addWidget(self.date_input)
         layout.addWidget(transaction_button)
         layout.addWidget(self.result_table)
-
-    def populate_table(self, results):
-        self.result_table.setRowCount(0)
-        self.result_table.setRowCount(len(results))
-
-        for r, row in enumerate(results):
-            (sale_id, logged_on, sku, part_name, quantity,
-             total_price, revenue, status, line_count, notes) = row
-
-            sku_item = QTableWidgetItem(str(sku))
-            if notes:
-                sku_item.setToolTip(notes)
-                sku_item.setForeground(NOTE_TEXT_COLOR)
-
-            status_item = QTableWidgetItem(str(status))
-            status_item.setForeground(QBrush(STATUS_COLORS.get(status, QColor("black"))))
-            status_item.setData(Qt.UserRole, sale_id)   # id lives on the row for the void button
-
-            # A sale drawn from more than one batch is worth flagging.
-            qty_text = f"{quantity} ({line_count} batches)" if line_count > 1 else str(quantity)
-
-            self.result_table.setItem(r, 0, QTableWidgetItem(str(logged_on)))
-            self.result_table.setItem(r, 1, sku_item)
-            self.result_table.setItem(r, 2, QTableWidgetItem(str(part_name)))
-            self.result_table.setItem(r, 3, QTableWidgetItem(qty_text))
-            self.result_table.setItem(r, 4, QTableWidgetItem(f"₱{total_price}"))
-            self.result_table.setItem(r, 5, QTableWidgetItem(f"₱{revenue}"))
-            self.result_table.setItem(r, 6, status_item)
 
     def handle_submit(self):
         date_string = self.date_input.date().toString("yyyy-MM-dd")
@@ -275,7 +493,7 @@ class transaction_page(QWidget):
             QMessageBox.critical(self, "Database Error", str(e))
             return
 
-        self.populate_table(results)   # an empty day is a valid result, not an error
+        self.result_table.populate(results)
 
 class OrderDetailsDialog(QDialog):
     """Collects the supplier for the order plus quantity and unit cost per item."""

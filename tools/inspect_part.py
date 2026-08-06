@@ -1,19 +1,22 @@
-import os, sqlite3, sys
+import os, sys
 
-DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mvr_inventory.db")
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from logic.db_connection import get_connection
+
 
 def inspect(sku):
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT id, part_name, current_stock FROM parts WHERE sku = ?", (sku,))
+    cur.execute("SELECT id, part_name, current_stock, srp_price FROM parts WHERE sku = ?", (sku,))
     row = cur.fetchone()
     if row is None:
         print(f"No part with sku {sku}")
+        conn.close()
         return
-    part_id, name, stock = row
+    part_id, name, stock, srp = row
     print(f"\n=== {sku} | {name} ===")
-    print(f"current_stock: {stock}")
+    print(f"current_stock: {stock}    srp: {srp}")
 
     print("\n-- batches (FIFO order) --")
     cur.execute("""
@@ -29,24 +32,35 @@ def inspect(sku):
         print(f"  id={b[0]:<4} {b[1]:<16} {b[3]}/{b[2]} left @ {b[4]:<6} recv {b[5]}")
     print(f"  SUM(qty_remaining) = {sum(b[3] for b in batches)}")
 
-    print("\n-- sales --")
+    print("\n-- sale lines --")
     cur.execute("""
-        SELECT t.id, t.timestamp, t.quantity, t.cost_at_time,
-               t.sale_at_time, t.revenue, COALESCE(s.name, '(opening)')
-        FROM v_transactions_with_revenue t
-        LEFT JOIN stock_batches b ON t.batch_id = b.id
+        SELECT v.sale_id, v.sale_date, v.status, v.quantity, v.cost_at_time,
+               v.sale_at_time, v.revenue, COALESCE(s.name, '(opening)')
+        FROM v_sale_lines_with_revenue v
+        LEFT JOIN stock_batches b ON v.batch_id = b.id
         LEFT JOIN suppliers s ON b.supplier_id = s.id
-        WHERE t.part_id = ?
-        ORDER BY t.id
+        WHERE v.part_id = ?
+        ORDER BY v.sale_id, v.line_id
     """, (part_id,))
-    sales = cur.fetchall()
-    for s in sales:
-        print(f"  id={s[0]:<4} {s[1]}  qty={s[2]:<4} cost/u={s[3]:<6} "
-              f"total={s[4]:<8} revenue={s[5]:<8} from {s[6]}")
-    if sales:
-        print(f"  total collected = {sum(s[4] for s in sales)}")
+    lines = cur.fetchall()
+    for l in lines:
+        mark = "  " if l[2] == "ACTIVE" else " *"
+        print(f" {mark} sale={l[0]:<4} {l[1]}  {l[2]:<7} qty={l[3]:<4} cost/u={l[4]:<6} "
+              f"total={l[5]:<8} revenue={l[6]:<8} from {l[7]}")
+
+    if lines:
+        active = [l for l in lines if l[2] == "ACTIVE"]
+        voided = [l for l in lines if l[2] != "ACTIVE"]
+        print(f"\n  active:  {len(active)} line(s), {sum(l[3] for l in active)} unit(s), "
+              f"collected {sum(l[5] for l in active)}, revenue {sum(l[6] for l in active)}")
+        if voided:
+            print(f"  voided:  {len(voided)} line(s), {sum(l[3] for l in voided)} unit(s) "
+                  f"(stock returned to batches, lines kept for audit)")
+    else:
+        print("  (no sales recorded for this part)")
 
     conn.close()
+
 
 if __name__ == "__main__":
     inspect(sys.argv[1] if len(sys.argv) > 1 else "18201044")
