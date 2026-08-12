@@ -1,6 +1,21 @@
 import sqlite3
 import csv
 import os
+import re
+
+
+def normalize_location(value):
+    """Canonical matching form for shelf location codes.
+
+    Used for lookups only -- shelves store their human-cased form.
+    'rl1-left', 'RL1 -  Left' and 'RL1 - Left' all normalize identically.
+    """
+    if value is None:
+        return ""
+    value = value.strip().upper()
+    value = re.sub(r"\s*-\s*", " - ", value)
+    value = re.sub(r"\s+", " ", value)
+    return value
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "mvr_inventory.db")
@@ -24,7 +39,7 @@ def initialize_database():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS shelves (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            location_code TEXT UNIQUE NOT NULL
+            location_code TEXT UNIQUE NOT NULL COLLATE NOCASE
             )
         """)
     
@@ -42,8 +57,10 @@ def initialize_database():
             part_name TEXT NOT NULL,
             base_cost_price INTEGER NOT NULL, 
             srp_price INTEGER NOT NULL,
-            current_stock INTEGER NOT NULL, 
+            current_stock INTEGER NOT NULL,
             shelf_id INTEGER,
+            placement TEXT NOT NULL DEFAULT 'SHELF'
+                CHECK (placement IN ('SHELF', 'FLOOR', 'HANGING')),
             stock_warning INTEGER,
             is_active INTEGER,
             FOREIGN KEY (shelf_id) REFERENCES shelves(id)
@@ -224,6 +241,7 @@ def seed_opening_batches():
 def migrate_csv_to_sql():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
 
     # Normalize ID text from CSV before matching against SKU values.
     def normalize_id(value):
@@ -274,27 +292,55 @@ def migrate_csv_to_sql():
     shelf_file = os.path.join(CSV_FOLDER, 'shelves.csv')
     if os.path.exists(shelf_file):
         with open(shelf_file, mode='r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            next(reader) # Skip header row
+            reader = csv.DictReader(f)
             for row in reader:
-                if len(row) > 1 and row[1].strip():
-                    cursor.execute("INSERT OR IGNORE INTO shelves (location_code) VALUES (?)", (row[1].strip(),))
+                code = (row.get('location_code') or '').strip()
+                if code:
+                    cursor.execute("INSERT OR IGNORE INTO shelves (location_code) VALUES (?)", (code,))
+
+    # Lookup for resolving parts.csv location codes -> shelf ids.
+    # Normalized on both sides so casing/spacing variants still match.
+    cursor.execute("SELECT location_code, id FROM shelves")
+    shelf_lookup = {normalize_location(code): sid for code, sid in cursor.fetchall()}
 
     # 4. Migrate Parts
     parts_file = os.path.join(CSV_FOLDER, 'parts.csv')
     if os.path.exists(parts_file):
+        unknown_locations = []
+        duplicate_skus = []
+        seen_skus = set()
         with open(parts_file, mode='r', encoding='utf-8') as f:
             reader = csv.reader(f)
             headers = [h.strip() for h in next(reader)]
             for row in reader:
                 if not row: continue
                 row_dict = dict(zip(headers, row))
-                shelf_id = row_dict.get('shelf_id')
-                shelf_id = int(shelf_id) if shelf_id and shelf_id.strip() else None
-                
+                sku = (row_dict.get('sku') or '').strip()
+
+                if sku in seen_skus:
+                    duplicate_skus.append(sku)
+                seen_skus.add(sku)
+
+                # Resolve human-readable location code to a shelf id.
+                # Unknown codes are collected and raised at the end --
+                # a typo must never silently become NULL.
+                location_code = (row_dict.get('location_code') or '').strip()
+                shelf_id = None
+                if location_code:
+                    if '(' in location_code:
+                        raise ValueError(
+                            f"{sku}: qualifiers belong in the placement column, "
+                            f"not location_code: {location_code!r}"
+                        )
+                    shelf_id = shelf_lookup.get(normalize_location(location_code))
+                    if shelf_id is None:
+                        unknown_locations.append((sku, location_code))
+
+                placement = (row_dict.get('placement') or '').strip().upper() or 'SHELF'
+
                 stock_warning = row_dict.get('stock_warning')
                 stock_warning = int(stock_warning) if stock_warning and stock_warning.strip() else None
-                
+
                 is_active = row_dict.get('is_active')
                 is_active = int(is_active) if is_active and is_active.strip() else None
 
@@ -310,13 +356,23 @@ def migrate_csv_to_sql():
 
                 cursor.execute("""
                     INSERT OR IGNORE INTO parts
-                    (sku, part_name, base_cost_price, srp_price, current_stock, shelf_id, stock_warning, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (sku, part_name, base_cost_price, srp_price, current_stock, shelf_id, placement, stock_warning, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    row_dict.get('sku'), row_dict.get('part_name'),
+                    sku, row_dict.get('part_name'),
                     base_cost_price, srp_price,
-                    current_stock, shelf_id, stock_warning, is_active
+                    current_stock, shelf_id, placement, stock_warning, is_active
                 ))
+
+        if unknown_locations:
+            conn.close()
+            raise ValueError(
+                "Unknown shelf locations in parts.csv (add them to shelves.csv "
+                f"or fix the typo): {unknown_locations}"
+            )
+        if duplicate_skus:
+            print(f"WARNING: duplicate SKUs in parts.csv -- second occurrence "
+                  f"was DISCARDED by INSERT OR IGNORE: {sorted(set(duplicate_skus))}")
 
     # 6. Migrate Aliases
     alias_file = os.path.join(CSV_FOLDER, 'Aliases.csv')
